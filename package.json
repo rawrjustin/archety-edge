@@ -1,0 +1,43 @@
+{
+  "name": "edge-agent",
+  "version": "1.0.0",
+  "description": "Mac Mini Edge Agent for iMessage relay to Sage backend",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest __tests__/unit",
+    "test:integration": "jest __tests__/integration"
+  },
+  "keywords": [
+    "imessage",
+    "edge-agent",
+    "relay"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.14.9",
+    "@types/uuid": "^10.0.0",
+    "axios": "^1.7.2",
+    "better-sqlite3": "^11.1.2",
+    "dotenv": "^16.4.5",
+    "js-yaml": "^4.1.0",
+    "typescript": "^5.5.3",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.4",
+    "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2"
+  }
+}

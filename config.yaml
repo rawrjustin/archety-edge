@@ -1,0 +1,18 @@
+edge:
+  agent_id: "edge_13106781670"  # Generated from phone number
+  user_phone: "+13106781670"    # Mac mini iMessage account
+
+backend:
+  url: "https://archety-backend.onrender.com"
+  sync_interval_seconds: 60
+
+imessage:
+  poll_interval_seconds: 2  # Faster polling for better responsiveness
+  db_path: "~/Library/Messages/chat.db"
+
+database:
+  path: "./edge-agent.db"
+
+logging:
+  level: "info"  # debug, info, warn, error
+  file: "./edge-agent.log"

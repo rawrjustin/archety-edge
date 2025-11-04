@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(node --version:*)",
+      "Bash(curl:*)",
+      "Bash(bash)",
+      "Bash(xcode-select:*)",
+      "Bash(sudo installer:*)",
+      "Bash(chmod:*)",
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "Bash(sqlite3:*)",
+      "Bash(pgrep:*)",
+      "Bash(osascript:*)",
+      "Bash(./edge-agent.sh:*)",
+      "Bash(sort:*)",
+      "Bash(top:*)",
+      "Bash(pkill:*)",
+      "Bash(kill:*)",
+      "Bash(launchctl list:*)",
+      "Bash(defaults write:*)",
+      "Bash(killall:*)",
+      "Bash(awk:*)",
+      "Bash(launchctl remove:*)",
+      "Bash(xargs kill -9)",
+      "Bash(launchctl load:*)",
+      "Bash(launchctl start:*)",
+      "Bash(launchctl unload:*)",
+      "Bash(xargs:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:coverage:*)",
+      "mcp__github__get_me",
+      "mcp__github__create_repository"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
