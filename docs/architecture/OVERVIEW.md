@@ -5,41 +5,51 @@
 The edge relay is a Node.js application that bridges iMessage with a cloud backend, enabling intelligent message processing and scheduled responses.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Edge Relay                            │
-│                     (Mac mini / macOS)                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌──────────────┐      ┌──────────────┐    ┌─────────────┐ │
-│  │  Messages DB │◄─────│   Transport  │────►│  Scheduler  │ │
-│  │   Polling    │      │  AppleScript │    │   SQLite    │ │
-│  └──────────────┘      └──────────────┘    └─────────────┘ │
-│         │                      │                   │         │
-│         ▼                      ▼                   ▼         │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │              Main Event Loop (index.ts)                 │ │
-│  │  • Polls for new iMessages every 2s                    │ │
-│  │  • Processes messages in parallel (up to 3 concurrent) │ │
-│  │  • Syncs with backend every 60s                        │ │
-│  │  • Executes scheduled messages                         │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                            │                                 │
-│                            ▼                                 │
-│                  ┌──────────────────┐                       │
-│                  │  Backend Client  │                       │
-│                  │  (RenderClient)  │                       │
-│                  │  • HMAC Auth     │                       │
-│                  │  • HTTP/2 Pool   │                       │
-│                  └──────────────────┘                       │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ HTTPS
-                           ▼
-              ┌────────────────────────┐
-              │   Backend (Render)     │
-              │  • Message processing  │
-              │  • Response generation │
-              │  • Command orchestr.   │
-              └────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Edge Relay                                    │
+│                     (Mac mini / macOS)                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌──────────────┐      ┌──────────────┐    ┌─────────────┐         │
+│  │  Messages DB │◄─────│   Transport  │────►│  Scheduler  │         │
+│  │   Polling    │      │  AppleScript │    │   SQLite    │         │
+│  └──────────────┘      └──────────────┘    └─────────────┘         │
+│         │                      │                   │                 │
+│  ┌──────────────┐      ┌──────────────┐    ┌─────────────┐         │
+│  │  Rule Engine │      │ Plan Manager │    │ Command     │         │
+│  │   SQLite     │      │   SQLite     │    │ Handler     │         │
+│  └──────────────┘      └──────────────┘    └─────────────┘         │
+│         │                      │                   │                 │
+│         ▼                      ▼                   ▼                 │
+│  ┌────────────────────────────────────────────────────────┐         │
+│  │              Main Event Loop (index.ts)                 │         │
+│  │  • Polls for new iMessages every 2s                    │         │
+│  │  • Evaluates messages against rules                    │         │
+│  │  • Processes messages in parallel (up to 3 concurrent) │         │
+│  │  • Syncs with backend every 60s / WebSocket push       │         │
+│  │  • Executes scheduled messages                         │         │
+│  │  • Manages conversation plans                          │         │
+│  └────────────────────────────────────────────────────────┘         │
+│                            │                                         │
+│                            ▼                                         │
+│          ┌──────────────────┐      ┌────────────────┐              │
+│          │  Backend Client  │      │  WebSocket     │              │
+│          │  (RenderClient)  │      │  Client        │              │
+│          │  • HMAC Auth     │      │  • Real-time   │              │
+│          │  • HTTP/2 Pool   │      │  • Auto-recon  │              │
+│          └──────────────────┘      └────────────────┘              │
+└──────────────────────┬──────────────────┬──────────────────────────┘
+                       │ HTTPS            │ WSS
+                       ▼                  ▼
+              ┌────────────────────────────────┐
+              │   Backend (Render)             │
+              │  • Message processing          │
+              │  • Response generation         │
+              │  • Command orchestration       │
+              │  • Rule management             │
+              │  • Plan updates                │
+              │  • WebSocket endpoint (TODO)   │
+              └────────────────────────────────┘
 ```
 
 ## Core Components
@@ -301,8 +311,63 @@ Use FSEvents or SQLite triggers instead of polling:
 - Zero CPU usage when idle
 - More complex implementation
 
+### 5. Rule Engine (`src/rules/`)
+
+**RuleEngine** - Message filtering and automation
+- SQLite-backed rule storage
+- Condition matching: equals, contains, starts_with, ends_with, regex
+- Rule types: auto_reply, forward, filter, schedule_reply
+- Evaluate incoming messages against enabled rules
+- Support for complex multi-condition rules
+
+**Rule Structure:**
+```typescript
+{
+  rule_id: string,
+  rule_type: 'auto_reply' | 'forward' | 'filter' | 'schedule_reply',
+  name: string,
+  enabled: boolean,
+  conditions: [
+    { field: 'sender'|'content'|'thread_id'|'is_group',
+      operator: 'equals'|'contains'|...,
+      value: string|boolean }
+  ],
+  action: {
+    type: 'reply'|'forward'|'block'|'schedule_reply',
+    parameters: { ... }
+  }
+}
+```
+
+### 6. Plan Manager (`src/plans/`)
+
+**PlanManager** - Conversation context management
+- SQLite-backed plan storage per thread
+- Version tracking for plan updates
+- Merge support for partial updates
+- Flexible plan structure (JSON)
+
+**Use Cases:**
+- Track conversation goals and progress
+- Maintain context across sessions
+- Store user preferences per thread
+- Multi-step conversation flows
+
+### 7. Command Handler (`src/commands/`)
+
+**CommandHandler** - Process backend commands
+- `schedule_message`: Schedule future messages
+- `cancel_scheduled`: Cancel pending messages
+- `set_rule`: Create/update automation rules
+- `update_plan`: Update conversation plans
+
+**Integration:**
+- Works with scheduler, rule engine, plan manager
+- Validates command payloads
+- Reports active rules count in sync status
+
 ## See Also
 
 - [Performance Details](./PERFORMANCE.md) - Optimization deep-dive
 - [API Specification](./API_SPEC.md) - Backend protocol
-- [Development Guide](../development/CONTRIBUTING.md) - Making changes
+- [TODO List](../TODO.md) - Future work and known issues
