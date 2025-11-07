@@ -3,8 +3,12 @@ import { Scheduler } from '../scheduler/Scheduler';
 import {
   EdgeCommandWrapper,
   ScheduleMessageCommand,
-  CancelScheduledCommand
+  CancelScheduledCommand,
+  SetRuleCommand,
+  UpdatePlanCommand
 } from '../interfaces/ICommands';
+import { RuleEngine, Rule } from '../rules/RuleEngine';
+import { PlanManager } from '../plans/PlanManager';
 
 /**
  * CommandHandler - Processes commands from backend
@@ -12,10 +16,14 @@ import {
 export class CommandHandler {
   private logger: ILogger;
   private scheduler: Scheduler;
+  private ruleEngine: RuleEngine | null = null;
+  private planManager: PlanManager | null = null;
 
-  constructor(scheduler: Scheduler, logger: ILogger) {
+  constructor(scheduler: Scheduler, logger: ILogger, ruleEngine?: RuleEngine, planManager?: PlanManager) {
     this.scheduler = scheduler;
     this.logger = logger;
+    this.ruleEngine = ruleEngine || null;
+    this.planManager = planManager || null;
   }
 
   /**
@@ -132,28 +140,139 @@ export class CommandHandler {
   }
 
   /**
-   * Handle set_rule command (placeholder for future implementation)
+   * Handle set_rule command
    */
   private async handleSetRule(
     command: EdgeCommandWrapper
   ): Promise<{ success: boolean; error?: string }> {
-    this.logger.info('set_rule command received (not yet implemented)');
-    return {
-      success: false,
-      error: 'Rule engine not yet implemented'
-    };
+    if (!this.ruleEngine) {
+      this.logger.warn('set_rule command received but rule engine not initialized');
+      return {
+        success: false,
+        error: 'Rule engine not initialized'
+      };
+    }
+
+    const payload = command.payload as SetRuleCommand['payload'];
+
+    try {
+      // Validate rule_type
+      const validRuleTypes = ['auto_reply', 'forward', 'filter', 'schedule_reply'];
+      if (!validRuleTypes.includes(payload.rule_type)) {
+        return {
+          success: false,
+          error: `Invalid rule_type: ${payload.rule_type}. Must be one of: ${validRuleTypes.join(', ')}`
+        };
+      }
+
+      // Create rule from payload
+      const rule: Rule = {
+        rule_id: command.command_id,
+        rule_type: payload.rule_type as any,
+        name: payload.rule_config.name || `Rule ${command.command_id}`,
+        enabled: payload.rule_config.enabled !== false,
+        conditions: payload.rule_config.conditions || [],
+        action: payload.rule_config.action,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Validate rule has required fields
+      if (!rule.conditions || rule.conditions.length === 0) {
+        return {
+          success: false,
+          error: 'Rule must have at least one condition'
+        };
+      }
+
+      if (!rule.action || !rule.action.type) {
+        return {
+          success: false,
+          error: 'Rule must have an action'
+        };
+      }
+
+      // Save the rule
+      this.ruleEngine.setRule(rule);
+
+      this.logger.info(`✅ Rule ${rule.rule_id} (${rule.name}) created/updated`);
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: `Failed to set rule: ${error.message}`
+      };
+    }
   }
 
   /**
-   * Handle update_plan command (placeholder for future implementation)
+   * Handle update_plan command
    */
   private async handleUpdatePlan(
     command: EdgeCommandWrapper
   ): Promise<{ success: boolean; error?: string }> {
-    this.logger.info('update_plan command received (not yet implemented)');
-    return {
-      success: false,
-      error: 'Plan updates not yet implemented'
-    };
+    if (!this.planManager) {
+      this.logger.warn('update_plan command received but plan manager not initialized');
+      return {
+        success: false,
+        error: 'Plan manager not initialized'
+      };
+    }
+
+    const payload = command.payload as UpdatePlanCommand['payload'];
+
+    try {
+      // Validate thread_id
+      if (!payload.thread_id) {
+        return {
+          success: false,
+          error: 'thread_id is required'
+        };
+      }
+
+      // Validate plan_data
+      if (!payload.plan_data) {
+        return {
+          success: false,
+          error: 'plan_data is required'
+        };
+      }
+
+      // Update the plan
+      this.planManager.setPlan(payload.thread_id, payload.plan_data);
+
+      this.logger.info(`✅ Plan updated for thread ${payload.thread_id}`);
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: `Failed to update plan: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Get the rule engine instance
+   */
+  getRuleEngine(): RuleEngine | null {
+    return this.ruleEngine;
+  }
+
+  /**
+   * Get the plan manager instance
+   */
+  getPlanManager(): PlanManager | null {
+    return this.planManager;
+  }
+
+  /**
+   * Get the number of active rules
+   */
+  getActiveRulesCount(): number {
+    if (!this.ruleEngine) {
+      return 0;
+    }
+    const stats = this.ruleEngine.getStats();
+    return stats.enabled;
   }
 }

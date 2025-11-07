@@ -83,7 +83,10 @@ export class RenderClient implements IBackendClient {
     this.logger.info('Registering edge agent with backend...');
 
     try {
-      const registrationToken = process.env.REGISTRATION_TOKEN || 'edge_manual_token';
+      const registrationToken = process.env.REGISTRATION_TOKEN;
+      if (!registrationToken) {
+        throw new Error('REGISTRATION_TOKEN environment variable is required');
+      }
 
       const response = await this.client.post('/edge/register', {
         user_phone: this.userPhone,

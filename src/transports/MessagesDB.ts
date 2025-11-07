@@ -102,13 +102,16 @@ export class MessagesDB {
         const appleEpoch = 978307200; // Unix timestamp for 2001-01-01
         const timestamp = new Date((row.date / 1000000000 + appleEpoch) * 1000);
 
+        // Get participants if it's a group chat
+        const participants = isGroup ? this.getGroupParticipants(row.thread_id) : [];
+
         messages.push({
           threadId: row.thread_id,
           sender: row.sender || 'unknown',
           text: row.text || '',
           timestamp,
           isGroup,
-          participants: [] // TODO: Query for group participants if needed
+          participants
         });
 
         this.logger.debug(`New message from ${row.sender}: "${row.text.substring(0, 50)}..."`);
@@ -121,6 +124,30 @@ export class MessagesDB {
       return messages;
     } catch (error: any) {
       this.logger.error('Failed to poll messages:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get participants for a group chat
+   * @param chatIdentifier The chat identifier (thread_id)
+   * @returns Array of participant phone numbers/emails
+   */
+  private getGroupParticipants(chatIdentifier: string): string[] {
+    try {
+      const query = `
+        SELECT DISTINCT h.id
+        FROM handle h
+        JOIN chat_handle_join chj ON h.ROWID = chj.handle_id
+        JOIN chat c ON chj.chat_id = c.ROWID
+        WHERE c.chat_identifier = ?
+        ORDER BY h.id
+      `;
+
+      const rows = this.db.prepare(query).all(chatIdentifier) as any[];
+      return rows.map(row => row.id).filter(id => id && id.length > 0);
+    } catch (error: any) {
+      this.logger.warn(`Failed to get participants for chat ${chatIdentifier}:`, error.message);
       return [];
     }
   }

@@ -11,17 +11,19 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+PLIST_DEST="/Library/LaunchDaemons/com.sage.edge-agent.plist"
+
 # Stop and unload the service
 if launchctl list | grep -q "com.sage.edge-agent"; then
     echo "Stopping service..."
     launchctl bootout system/com.sage.edge-agent 2>/dev/null || true
-    launchctl unload /Library/LaunchDaemons/com.sage.edge-agent.plist 2>/dev/null || true
+    launchctl unload "$PLIST_DEST" 2>/dev/null || true
 fi
 
 # Remove plist file
-if [ -f "/Library/LaunchDaemons/com.sage.edge-agent.plist" ]; then
+if [ -f "$PLIST_DEST" ]; then
     echo "Removing plist file..."
-    rm /Library/LaunchDaemons/com.sage.edge-agent.plist
+    rm "$PLIST_DEST"
 fi
 
 echo ""

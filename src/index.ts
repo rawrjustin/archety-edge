@@ -11,6 +11,8 @@ import { RenderClient } from './backend/RenderClient';
 import { WebSocketClient } from './backend/WebSocketClient';
 import { Scheduler } from './scheduler/Scheduler';
 import { CommandHandler } from './commands/CommandHandler';
+import { RuleEngine } from './rules/RuleEngine';
+import { PlanManager } from './plans/PlanManager';
 import { v4 as uuidv4 } from 'uuid';
 import { EdgeEventWrapper } from './interfaces/ICommands';
 
@@ -24,6 +26,8 @@ class EdgeAgent {
   private backend: RenderClient;
   private wsClient: WebSocketClient;
   private scheduler: Scheduler;
+  private ruleEngine: RuleEngine;
+  private planManager: PlanManager;
   private commandHandler: CommandHandler;
   private pollInterval: NodeJS.Timeout | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
@@ -51,7 +55,10 @@ class EdgeAgent {
     );
 
     // Initialize backend client
-    const secret = process.env.EDGE_SECRET || 'CHANGE_THIS_SECRET_IN_PRODUCTION';
+    const secret = process.env.EDGE_SECRET;
+    if (!secret) {
+      throw new Error('EDGE_SECRET environment variable is required');
+    }
     this.backend = new RenderClient(
       this.config.backend.url,
       this.config.edge.user_phone,
@@ -70,8 +77,16 @@ class EdgeAgent {
     const dbPath = this.config.database?.path || './data/scheduler.db';
     this.scheduler = new Scheduler(dbPath, this.transport, this.logger);
 
+    // Initialize rule engine
+    const rulesDbPath = this.config.database?.rules_path || './data/rules.db';
+    this.ruleEngine = new RuleEngine(rulesDbPath, this.logger);
+
+    // Initialize plan manager
+    const plansDbPath = this.config.database?.plans_path || './data/plans.db';
+    this.planManager = new PlanManager(plansDbPath, this.logger);
+
     // Initialize command handler
-    this.commandHandler = new CommandHandler(this.scheduler, this.logger);
+    this.commandHandler = new CommandHandler(this.scheduler, this.logger, this.ruleEngine, this.planManager);
 
     // Set up WebSocket callbacks
     this.wsClient.onCommand(async (command) => {
@@ -375,7 +390,7 @@ class EdgeAgent {
         pending_events: this.pendingEvents,
         status: {
           scheduled_messages: stats.pending,
-          active_rules: 0, // TODO: Implement rule engine
+          active_rules: this.commandHandler.getActiveRulesCount(),
           uptime_seconds: uptimeSeconds
         }
       };
