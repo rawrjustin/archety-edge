@@ -12,7 +12,13 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:unit": "jest __tests__/unit",
-    "test:integration": "jest __tests__/integration"
+    "test:integration": "jest __tests__/integration",
+    "service:install": "npm run build && sudo ./install-launchdaemon.sh",
+    "service:uninstall": "sudo ./uninstall-launchdaemon.sh",
+    "service:status": "sudo launchctl list | grep edge-agent || echo 'Service not running'",
+    "service:logs": "tail -f logs/edge-agent.out.log",
+    "service:errors": "tail -f logs/edge-agent.err.log",
+    "service:restart": "npm run service:uninstall && npm run service:install"
   },
   "keywords": [
     "imessage",
@@ -26,12 +32,14 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.9",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "axios": "^1.7.2",
     "better-sqlite3": "^11.1.2",
     "dotenv": "^16.4.5",
     "js-yaml": "^4.1.0",
     "typescript": "^5.5.3",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

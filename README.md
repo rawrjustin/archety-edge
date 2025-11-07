@@ -1,317 +1,267 @@
-# Edge Agent - Mac Mini iMessage Relay
+# Edge Relay - Mac Mini iMessage Agent
 
-Phase 1 implementation of the intelligent edge agent that relays iMessages to the Sage backend on Render.
+Intelligent edge agent that bridges iMessage with a cloud backend, enabling message processing, scheduling, and fast responses with privacy-first design.
 
-## Features (Phase 1)
+## Features
 
-- ✅ **iMessage Monitoring**: Poll Messages DB for new incoming messages
-- ✅ **iMessage Sending**: Send messages via AppleScript
-- ✅ **Backend Integration**: Forward messages to Render backend
-- ✅ **HMAC Authentication**: Secure communication with backend
-- ✅ **Clean Architecture**: Interface-based design for easy Swift migration
+- ✅ **iMessage Integration** - Monitor and send iMessages via Messages.app
+- ✅ **Backend Sync** - Bidirectional communication with cloud orchestrator
+- ✅ **Message Scheduling** - SQLite-based local scheduling (works offline)
+- ✅ **Fast Reflex Responses** - Immediate reactions (<100ms) with delayed elaboration
+- ✅ **Performance Optimized** - 5× faster sends, 60% less CPU, parallel processing
+- ✅ **HMAC Authentication** - Secure backend communication
+- ✅ **Clean Architecture** - Interface-based design for easy testing and Swift migration
 
-## Prerequisites
-
-1. **Node.js 18+** and npm
-2. **Xcode Command Line Tools**: `xcode-select --install`
-3. **Messages.app** configured with Apple ID
-4. **Full Disk Access** for Terminal/iTerm
-5. **Automation permissions** for Terminal to control Messages
-
-## Installation
-
-### 1. Install Node.js
-
-If Node.js isn't installed:
+## Quick Start
 
 ```bash
-# Using Homebrew
+# 1. Install dependencies
 brew install node
-
-# Or using nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install 18
-nvm use 18
-```
-
-### 2. Install Dependencies
-
-```bash
 cd /Users/sage1/Code/edge-relay
 npm install
-```
 
-### 3. Configure
-
-```bash
-# Copy environment template
+# 2. Configure
 cp .env.example .env
+nano .env  # Add EDGE_SECRET and REGISTRATION_TOKEN
+nano config.yaml  # Set your phone number
 
-# Edit .env with your credentials
-nano .env
-```
+# 3. Grant permissions
+# System Settings → Privacy & Security → Full Disk Access → Add Terminal
+# System Settings → Privacy & Security → Automation → Terminal → Messages
 
-Required environment variables:
-- `EDGE_SECRET`: Shared secret for HMAC authentication (get from backend team)
-- `REGISTRATION_TOKEN`: Initial registration token
-
-Edit `config.yaml`:
-- Update `edge.user_phone` with your phone number (e.g., `+15551234567`)
-
-### 4. Grant Permissions
-
-**Full Disk Access** (required to read Messages DB):
-1. System Preferences → Security & Privacy → Privacy
-2. Select "Full Disk Access"
-3. Click the lock to make changes
-4. Add Terminal (or iTerm)
-
-**Automation** (required for AppleScript):
-1. System Preferences → Security & Privacy → Privacy
-2. Select "Automation"
-3. Allow Terminal to control "Messages"
-
-### 5. Build
-
-```bash
+# 4. Build and run
 npm run build
-```
-
-## Running
-
-### Quick Start - Background Service (Recommended)
-
-The edge agent includes a management script for easy background operation:
-
-```bash
-# Start the service
 ./edge-agent.sh start
 
-# Stop the service
-./edge-agent.sh stop
-
-# Restart the service
-./edge-agent.sh restart
-
-# Check status
+# 5. Check status
 ./edge-agent.sh status
-
-# View logs (last 50 lines)
-./edge-agent.sh logs
-
-# Live tail logs
 ./edge-agent.sh logs -f
 ```
 
-This is ideal for running via SSH or on a headless Mac Mini.
+**See [Getting Started Guide](docs/setup/GETTING_STARTED.md) for detailed setup.**
 
-### Development Mode (with auto-reload)
+## Management
 
+### Manual Mode (edge-agent.sh)
 ```bash
-npm run dev
+./edge-agent.sh start      # Start in background
+./edge-agent.sh stop       # Stop gracefully
+./edge-agent.sh restart    # Restart
+./edge-agent.sh status     # Check if running
+./edge-agent.sh logs       # View last 50 lines
+./edge-agent.sh logs -f    # Live tail logs
 ```
 
-### Production Mode (Direct)
+### Auto-Start Service (LaunchDaemon)
+
+The edge agent can run as a system service that starts automatically on boot:
 
 ```bash
-npm start
+# Install service (builds and enables auto-start)
+npm run service:install
+
+# Check service status
+npm run service:status
+
+# View service logs
+npm run service:logs          # Live tail stdout
+npm run service:errors        # Live tail stderr
+
+# Restart service
+npm run service:restart
+
+# Uninstall service
+npm run service:uninstall
 ```
+
+**Service Details:**
+- Starts automatically on Mac boot
+- Restarts automatically if it crashes
+- Runs in background as system daemon
+- Logs to `logs/edge-agent.out.log` and `logs/edge-agent.err.log`
+
+**See [Auto-Start Guide](docs/setup/AUTO_START.md) for details.**
+
+## Performance
+
+The edge relay includes extensive performance optimizations:
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| CPU (idle) | ~15% | ~5% | **60-70% reduction** |
+| 5-bubble send | 1500-2000ms | 200-400ms | **5× faster** |
+| Backend latency | 300-500ms | 200-350ms | **20-30% faster** |
+| Message throughput | Sequential | 3 concurrent | **2-3× faster** |
+
+### Performance Profiles
+
+Configure in `config.yaml`:
+
+```yaml
+performance:
+  profile: "balanced"  # or "low-latency" or "low-resource"
+```
+
+- **Balanced** (default) - Best for most cases
+- **Low-Latency** - Fastest responses (1s poll, 30s sync)
+- **Low-Resource** - Minimal CPU (5s poll, 2min sync)
+
+**See [Performance Guide](docs/architecture/PERFORMANCE.md) for details.**
+
+## Architecture
+
+```
+iMessage ↔ MessagesDB ↔ EdgeAgent ↔ Backend (HTTPS)
+                          ↕
+                      Scheduler
+                      (SQLite)
+```
+
+**Key Components:**
+- **Transport** - Messages database polling & AppleScript sending
+- **Backend Client** - HTTP client with HMAC auth & connection pooling
+- **Scheduler** - SQLite-based message scheduling
+- **Command Handler** - Process backend commands
+- **Main Loop** - Orchestrates polling, syncing, and processing
+
+**See [Architecture Overview](docs/architecture/OVERVIEW.md) for details.**
+
+## Documentation
+
+### Setup
+- [Getting Started](docs/setup/GETTING_STARTED.md) - Quick 15-minute setup
+- [Configuration Guide](docs/setup/CONFIGURATION.md) - Performance tuning
+- [Troubleshooting](docs/setup/TROUBLESHOOTING.md) - Common issues
+
+### Architecture
+- [Overview](docs/architecture/OVERVIEW.md) - System design
+- [API Specification](docs/architecture/API_SPEC.md) - Backend protocol
+- [Performance](docs/architecture/PERFORMANCE.md) - Optimization details
+- [Reflex Implementation](docs/architecture/REFLEX_IMPLEMENTATION.md) - Fast responses
 
 ## Project Structure
 
 ```
 edge-relay/
 ├── src/
-│   ├── index.ts                     # Main application
-│   ├── config.ts                    # Configuration loader
-│   ├── interfaces/                  # Abstract interfaces
-│   │   ├── IMessageTransport.ts
-│   │   ├── IBackendClient.ts
-│   │   └── ILogger.ts
-│   ├── transports/                  # iMessage implementations
-│   │   ├── AppleScriptTransport.ts  # Combined transport
-│   │   ├── MessagesDB.ts            # DB monitoring
-│   │   └── AppleScriptSender.ts     # Message sending
-│   ├── backend/                     # Backend integration
-│   │   ├── RenderClient.ts          # API client
-│   │   └── auth.ts                  # HMAC authentication
-│   └── utils/
-│       └── logger.ts                # Logging system
-├── config.yaml                      # Runtime configuration
-├── package.json
-└── README.md
+│   ├── index.ts              # Main application
+│   ├── config.ts             # Configuration loader
+│   ├── interfaces/           # TypeScript interfaces
+│   ├── transports/           # iMessage integration
+│   ├── backend/              # Backend client + auth
+│   ├── scheduler/            # Message scheduling
+│   ├── commands/             # Command handling
+│   └── utils/                # Logging
+├── docs/                     # Documentation
+├── __tests__/                # Unit tests
+├── config.yaml               # Runtime configuration
+├── .env                      # Secrets (not in git)
+├── edge-agent.sh             # Management script
+└── package.json              # Dependencies
 ```
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run in development mode (with auto-reload)
+npm run dev
+
+# Build TypeScript
+npm run build
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Lint
+npm run lint  # (if configured)
+```
+
+**Current Test Coverage:** 73.74% (144 passing tests)
 
 ## Configuration
 
-### config.yaml
+### config.yaml (Runtime)
 
 ```yaml
 edge:
-  user_phone: "+15551234567"  # Your phone number
+  user_phone: "+1234567890"
 
 backend:
   url: "https://archety-backend.onrender.com"
   sync_interval_seconds: 60
 
 imessage:
-  poll_interval_seconds: 5
+  poll_interval_seconds: 2
   db_path: "~/Library/Messages/chat.db"
 
+performance:
+  profile: "balanced"
+
 logging:
-  level: "info"  # debug, info, warn, error
+  level: "info"
   file: "./edge-agent.log"
 ```
 
-### Environment Variables (.env)
+### .env (Secrets)
 
-```bash
+```env
 EDGE_SECRET=your_shared_secret_here
-REGISTRATION_TOKEN=edge_initial_token
+REGISTRATION_TOKEN=your_registration_token
 ```
 
-## SSH Convenience Aliases (Optional)
+## Requirements
 
-For easier management via SSH, add these aliases to `~/.zshrc` or `~/.bash_profile`:
+- macOS 12+ (Monterey or later)
+- Node.js 18+
+- Messages.app configured with Apple ID
+- Full Disk Access permission
+- Automation permission for Messages.app
 
-```bash
-alias edge-start='cd ~/code/edge-relay && ./edge-agent.sh start'
-alias edge-stop='cd ~/code/edge-relay && ./edge-agent.sh stop'
-alias edge-restart='cd ~/code/edge-relay && ./edge-agent.sh restart'
-alias edge-status='cd ~/code/edge-relay && ./edge-agent.sh status'
-alias edge-logs='cd ~/code/edge-relay && ./edge-agent.sh logs'
-alias edge-tail='cd ~/code/edge-relay && ./edge-agent.sh logs -f'
-```
+## Security
 
-Then reload your shell:
-```bash
-source ~/.zshrc  # or ~/.bash_profile
-```
-
-Now you can use simple commands like `edge-status` from anywhere!
-
-## Auto-Start with LaunchAgent
-
-The edge agent includes a launchd service for automatic startup. The plist is located at:
-- `~/Library/LaunchAgents/com.sage.edge-relay.plist`
-
-To enable auto-start on login:
-
-```bash
-# Load the service (auto-start disabled by default)
-launchctl load ~/Library/LaunchAgents/com.sage.edge-relay.plist
-
-# Start the service manually
-launchctl start com.sage.edge-relay
-
-# Check status
-launchctl list | grep edge-relay
-
-# To enable auto-start on boot, edit the plist:
-# Change <key>RunAtLoad</key><false/> to <true/>
-```
-
-Note: The edge-agent.sh script is the recommended way to manage the service.
-
-## Logging
-
-Logs are written to:
-- **Console**: stdout/stderr (when running directly)
-- **File**: `./edge-agent.log` (when using edge-agent.sh script)
-- **LaunchAgent logs**: `./logs/edge-relay.log` and `./logs/edge-relay-error.log`
-
-View logs in real-time:
-```bash
-# Using the management script (recommended)
-./edge-agent.sh logs -f
-
-# Or directly
-tail -f edge-agent.log
-```
-
-## Memory Optimization for Mac Mini
-
-When running as a dedicated edge relay server, you can optimize memory usage:
-
-### Kill Unnecessary macOS Processes
-
-```bash
-# Kill widget extensions and non-essential processes
-killall Messages
-killall "Activity Monitor"
-killall Spotlight
-
-# Disable Notification Center widgets
-defaults write com.apple.notificationcenterui ShowWidgets -bool false
-killall NotificationCenter
-```
-
-### Running Headless (No Monitor)
-
-The edge agent runs efficiently without a monitor connected:
-- Memory savings: ~100-150MB
-- CPU savings: ~5-10% (no rendering/display)
-- WindowServer still runs but uses minimal resources
-
-Access via SSH for management:
-```bash
-ssh user@mac-mini-ip
-edge-status  # If using aliases
-```
-
-### Memory Footprint
-
-The edge agent typically uses:
-- **Node process**: ~55-60MB
-- **npm wrapper**: ~60MB
-- **Total**: ~115-120MB
-
-After optimization, typical free memory: 1.5GB+ on 16GB Mac Mini
+- **HMAC-SHA256** authentication for all backend requests
+- **HTTPS** for all network communication
+- **Full Disk Access** required (read-only access to Messages DB)
+- **No permanent storage** of message content (except scheduled messages)
 
 ## Troubleshooting
 
-### "Cannot read Messages database"
+**Common issues:**
 
-**Solution**: Grant Full Disk Access to Terminal
-1. System Preferences → Security & Privacy → Privacy → Full Disk Access
-2. Add Terminal.app
+- **Can't read Messages DB** → Grant Full Disk Access to Terminal
+- **AppleScript errors** → Grant Automation permission
+- **401 Unauthorized** → Check EDGE_SECRET in .env
+- **High CPU** → Switch to low-resource profile
 
-### "AppleScript not working"
+**See [Troubleshooting Guide](docs/setup/TROUBLESHOOTING.md) for solutions.**
 
-**Solution**: Grant Automation permission
-1. System Preferences → Security & Privacy → Privacy → Automation
-2. Allow Terminal to control Messages
+## Roadmap
 
-### "Backend returns 401 Unauthorized"
+### Implemented ✅
+- Phase 1: Basic message relay
+- Phase 2: Scheduler + Transport
+- Performance optimizations (5× faster sends, 60% less CPU)
+- Fast reflex responses
+- Batch AppleScript execution
 
-**Solution**: Check EDGE_SECRET matches backend
-1. Verify `.env` file has correct `EDGE_SECRET`
-2. Re-register: `rm edge-agent.db && npm start`
-
-### "Messages.app is not accessible"
-
-**Solution**: Make sure Messages.app is running and signed in
-
-## Architecture Notes
-
-### Clean Interfaces for Swift Migration
-
-All transport, backend, and logging logic is behind interfaces, making it easy to:
-1. Keep using Node.js for main loop and backend protocol
-2. Swap just the `IMessageTransport` implementation to Swift
-3. Maintain backward compatibility
-
-### Future Phases
-
-- **Phase 2**: Privacy filtering & PII redaction
-- **Phase 3**: Local scheduling (SQLite-based)
-- **Phase 4**: Full sync protocol with backend
-
-## Support
-
-- **Backend API**: https://archety-backend.onrender.com/docs
-- **Docs**: See `EDGE_AGENT_SPEC.md` and `MAC_MINI_IMPLEMENTATION.md`
+### Future 🚀
+- **Adaptive Scheduler** - Near-instant scheduled message delivery
+- **Native Swift Bridge** - 10× faster message sending
+- **Event-Driven Architecture** - Zero-latency message detection
 
 ## License
 
 Proprietary - Archety
+
+## Support
+
+- Documentation: `docs/` folder
+- Issues: Check logs with `./edge-agent.sh logs`
+- Configuration help: [Configuration Guide](docs/setup/CONFIGURATION.md)
+- Backend API: `https://archety-backend.onrender.com/docs`

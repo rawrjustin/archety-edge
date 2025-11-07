@@ -20,7 +20,12 @@ export interface BackendMessageRequest {
 export interface BackendMessageResponse {
   should_respond: boolean;
   reply_text?: string;
-  reply_bubbles?: string[];  // NEW: Multi-bubble support
+  reply_bubbles?: string[];  // Multi-bubble support
+
+  // NEW: Fast reflex support
+  reflex_message?: string;  // Immediate response (sent first, ~100ms target)
+  burst_messages?: string[];  // Follow-up messages (sent after delay)
+  burst_delay_ms?: number;  // Delay before burst (default: 2000ms)
 }
 
 export interface IBackendClient {

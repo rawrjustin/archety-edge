@@ -83,7 +83,16 @@ export class CommandHandler {
         command.command_id
       );
 
-      this.logger.info(`Scheduled message ${scheduleId} for ${sendAt.toISOString()}`);
+      const now = new Date();
+      const isImmediate = sendAt <= now || command.priority === 'immediate';
+
+      if (isImmediate) {
+        this.logger.info(`⚡ Message scheduled for immediate send (send_at: ${sendAt.toISOString()}, priority: ${command.priority})`);
+        // Trigger immediate scheduler check for messages due now or in the past
+        setImmediate(() => this.scheduler.checkNow());
+      } else {
+        this.logger.info(`📅 Scheduled message ${scheduleId} for ${sendAt.toISOString()}`);
+      }
 
       return { success: true };
     } catch (error: any) {

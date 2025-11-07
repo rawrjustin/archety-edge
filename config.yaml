@@ -3,8 +3,13 @@ edge:
   user_phone: "+13106781670"    # Mac mini iMessage account
 
 backend:
-  url: "https://archety-backend.onrender.com"
-  sync_interval_seconds: 60
+  url: "https://archety-backend-production.up.railway.app"
+  sync_interval_seconds: 30  # Fallback polling interval if WebSocket disconnects
+
+websocket:
+  enabled: true  # Use WebSocket for real-time command delivery
+  reconnect_attempts: 10  # Max reconnection attempts before giving up
+  ping_interval_seconds: 30  # Keepalive ping frequency
 
 imessage:
   poll_interval_seconds: 2  # Faster polling for better responsiveness

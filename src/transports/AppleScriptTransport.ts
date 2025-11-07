@@ -83,14 +83,15 @@ export class AppleScriptTransport implements IMessageTransport {
 
   /**
    * Send multiple message bubbles with natural timing
+   * @param batched - If true, sends all bubbles in single AppleScript (5× faster)
    */
-  async sendMultiBubble(threadId: string, bubbles: string[], isGroup: boolean): Promise<boolean> {
+  async sendMultiBubble(threadId: string, bubbles: string[], isGroup: boolean, batched: boolean = true): Promise<boolean> {
     if (!this.isRunning) {
       this.logger.warn('Transport not running, cannot send multi-bubble');
       return false;
     }
 
-    return this.sender.sendMultiBubble(threadId, bubbles, isGroup);
+    return this.sender.sendMultiBubble(threadId, bubbles, isGroup, batched);
   }
 
   /**

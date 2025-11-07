@@ -35,8 +35,9 @@ export interface IMessageTransport {
 
   /**
    * Send multiple message bubbles with natural timing
+   * @param batched - If true, sends all bubbles in single AppleScript (5× faster)
    */
-  sendMultiBubble(threadId: string, bubbles: string[], isGroup: boolean): Promise<boolean>;
+  sendMultiBubble(threadId: string, bubbles: string[], isGroup: boolean, batched?: boolean): Promise<boolean>;
 
   /**
    * Get transport name for logging

@@ -47,6 +47,8 @@ export interface EdgeCommandWrapper {
   command_id: string;
   command_type: string;
   payload: any;
+  timestamp?: string;  // ISO8601 timestamp
+  priority?: 'normal' | 'immediate';  // Command priority
 }
 
 // ==================== EVENTS (Edge → Backend) ====================
