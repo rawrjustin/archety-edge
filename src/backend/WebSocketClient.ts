@@ -13,7 +13,6 @@ export class WebSocketClient {
   private edgeAgentId: string | null = null;
   private secret: string;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
   private reconnectDelay = 1000; // Start with 1 second
   private maxReconnectDelay = 60000; // Max 60 seconds
   private isConnecting = false;
@@ -220,11 +219,9 @@ export class WebSocketClient {
       this.onDisconnectedCallback();
     }
 
-    // Attempt reconnection if enabled
-    if (this.shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+    // Attempt reconnection if enabled (will retry indefinitely)
+    if (this.shouldReconnect) {
       this.scheduleReconnect();
-    } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.logger.error('Max reconnection attempts reached. Giving up on WebSocket.');
     }
   }
 
@@ -235,10 +232,10 @@ export class WebSocketClient {
     this.reconnectAttempts++;
     const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), this.maxReconnectDelay);
 
-    this.logger.info(`Scheduling WebSocket reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    this.logger.info(`Scheduling WebSocket reconnect attempt #${this.reconnectAttempts} in ${delay}ms`);
 
     setTimeout(() => {
-      this.logger.info(`Attempting WebSocket reconnect (attempt ${this.reconnectAttempts})`);
+      this.logger.info(`Attempting WebSocket reconnect (attempt #${this.reconnectAttempts})`);
       this.connect();
     }, delay);
   }

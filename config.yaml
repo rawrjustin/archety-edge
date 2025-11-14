@@ -1,6 +1,6 @@
 edge:
-  agent_id: "edge_13106781670"  # Generated from phone number
-  user_phone: "+13106781670"    # Mac mini iMessage account
+  agent_id: "edge_13238407486"  # Generated from phone number
+  user_phone: "+13238407486"    # Mac mini iMessage account
 
 backend:
   url: "https://archety-backend-production.up.railway.app"
@@ -8,15 +8,19 @@ backend:
 
 websocket:
   enabled: true  # Use WebSocket for real-time command delivery
-  reconnect_attempts: 10  # Max reconnection attempts before giving up
+  reconnect_attempts: 10  # DEPRECATED: WebSocket now retries indefinitely (unlimited attempts)
   ping_interval_seconds: 30  # Keepalive ping frequency
 
 imessage:
-  poll_interval_seconds: 2  # Faster polling for better responsiveness
+  poll_interval_seconds: 1  # Quick Win: Faster detection (0-1s vs 0-2s)
   db_path: "~/Library/Messages/chat.db"
 
 database:
   path: "./edge-agent.db"
+
+scheduler:
+  adaptive_mode: true  # Phase 3: Adaptive scheduling for near-instant delivery
+  check_interval_seconds: 30  # Fallback interval (used when adaptive_mode is false)
 
 logging:
   level: "info"  # debug, info, warn, error

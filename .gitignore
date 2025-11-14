@@ -25,3 +25,10 @@ edge-agent.pid
 .idea/
 *.swp
 *.swo
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Runtime data
+data/
+*.db

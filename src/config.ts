@@ -17,7 +17,7 @@ const PERFORMANCE_PROFILES = {
       max_concurrent_requests: 3
     },
     imessage: {
-      poll_interval_seconds: 2,
+      poll_interval_seconds: 1,  // Quick Win: 1s polling for fast detection
       enable_fast_check: true,
       max_messages_per_poll: 100
     },
@@ -32,7 +32,7 @@ const PERFORMANCE_PROFILES = {
       max_concurrent_requests: 5
     },
     imessage: {
-      poll_interval_seconds: 1,
+      poll_interval_seconds: 0.5,  // Ultra-responsive
       enable_fast_check: true,
       max_messages_per_poll: 100
     },
@@ -47,7 +47,7 @@ const PERFORMANCE_PROFILES = {
       max_concurrent_requests: 2
     },
     imessage: {
-      poll_interval_seconds: 5,
+      poll_interval_seconds: 3,  // Lower CPU usage
       enable_fast_check: true,
       max_messages_per_poll: 50
     },
@@ -70,7 +70,7 @@ export interface Config {
   };
   websocket?: {
     enabled?: boolean;  // Default: true (enable WebSocket for real-time commands)
-    reconnect_attempts?: number;  // Default: 10
+    reconnect_attempts?: number;  // DEPRECATED: Ignored (WebSocket now retries indefinitely)
     ping_interval_seconds?: number;  // Default: 30
   };
   imessage: {
@@ -84,7 +84,7 @@ export interface Config {
   };
   scheduler?: {
     check_interval_seconds?: number;  // Default: 30
-    adaptive_polling?: boolean;  // Default: false (future optimization)
+    adaptive_mode?: boolean;  // Default: true (Phase 3: near-instant delivery)
   };
   performance?: {
     profile?: 'balanced' | 'low-latency' | 'low-resource';  // Default: 'balanced'
@@ -122,7 +122,7 @@ export function loadConfig(configPath: string = './config.yaml'): Config {
     config.scheduler = {};
   }
   config.scheduler.check_interval_seconds = config.scheduler.check_interval_seconds ?? profileDefaults.scheduler.check_interval_seconds;
-  config.scheduler.adaptive_polling = config.scheduler.adaptive_polling ?? false;
+  config.scheduler.adaptive_mode = config.scheduler.adaptive_mode ?? true;  // Phase 3: Enable by default
 
   // Apply performance defaults
   if (!config.performance) {
@@ -136,7 +136,7 @@ export function loadConfig(configPath: string = './config.yaml'): Config {
     config.websocket = {};
   }
   config.websocket.enabled = config.websocket.enabled ?? true;
-  config.websocket.reconnect_attempts = config.websocket.reconnect_attempts ?? 10;
+  config.websocket.reconnect_attempts = config.websocket.reconnect_attempts ?? 10;  // DEPRECATED: Ignored (kept for backward compatibility)
   config.websocket.ping_interval_seconds = config.websocket.ping_interval_seconds ?? 30;
 
   // Override with environment variables if present

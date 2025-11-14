@@ -138,7 +138,9 @@ class EdgeAgent {
 
       // Start scheduler
       this.logger.info('Starting scheduler...');
-      this.scheduler.start(30); // Check every 30 seconds
+      const schedulerInterval = this.config.scheduler?.check_interval_seconds ?? 30;
+      const schedulerAdaptive = this.config.scheduler?.adaptive_mode ?? true;
+      this.scheduler.start(schedulerInterval, schedulerAdaptive);
       const stats = this.scheduler.getStats();
       this.logger.info(`✅ Scheduler ready (${stats.pending} pending messages)`);
 

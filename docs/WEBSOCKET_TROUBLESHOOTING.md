@@ -5,7 +5,7 @@
 The edge agent is attempting to connect but receiving `403` errors:
 
 ```
-[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13106781670
+[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486
 [ERROR] WebSocket error: ["Unexpected server response: 403"]
 ```
 
@@ -13,18 +13,18 @@ The edge agent is attempting to connect but receiving `403` errors:
 
 ### Connection URL
 ```
-wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13106781670
+wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486
 ```
 
 ### Headers
 ```
 Authorization: Bearer 74a0e606d739d31eda5dafb6f7e0f345d4756df0fe908282715174fd8978e261
-X-Edge-Agent-Id: edge_13106781670
+X-Edge-Agent-Id: edge_13238407486
 ```
 
 ### Edge Agent Details
-- **Edge Agent ID:** `edge_13106781670`
-- **User Phone:** `+13106781670`
+- **Edge Agent ID:** `edge_13238407486`
+- **User Phone:** `+13238407486`
 - **Secret:** `74a0e606d739d31eda5dafb6f7e0f345d4756df0fe908282715174fd8978e261`
 
 ## Common Causes of 403 Error
@@ -65,7 +65,7 @@ if (token !== expectedSecret) {
 
 ### 3. Edge Agent ID Not Found
 
-The backend might be checking if `edge_13106781670` exists in the database.
+The backend might be checking if `edge_13238407486` exists in the database.
 
 **Check:**
 ```typescript
@@ -144,15 +144,15 @@ EDGE_SECRET=74a0e606d739d31eda5dafb6f7e0f345d4756df0fe908282715174fd8978e261
 
 ### Step 4: Verify Edge Agent Registration
 
-Check if `edge_13106781670` is registered in your database:
+Check if `edge_13238407486` is registered in your database:
 
 ```sql
-SELECT * FROM edge_agents WHERE edge_agent_id = 'edge_13106781670';
+SELECT * FROM edge_agents WHERE edge_agent_id = 'edge_13238407486';
 ```
 
 Or via your API:
 ```bash
-curl https://archety-backend-production.up.railway.app/edge/agents/edge_13106781670 \
+curl https://archety-backend-production.up.railway.app/edge/agents/edge_13238407486 \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
@@ -160,7 +160,7 @@ curl https://archety-backend-production.up.railway.app/edge/agents/edge_13106781
 
 ### Edge Agent Logs (Success)
 ```
-[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13106781670
+[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486
 [INFO] ✅ WebSocket connected - real-time mode enabled
 [INFO] 🔌 WebSocket connected - real-time command delivery enabled
 [INFO] Command delivery: Real-time via WebSocket 🚀
@@ -168,8 +168,8 @@ curl https://archety-backend-production.up.railway.app/edge/agents/edge_13106781
 
 ### Backend Logs (Success)
 ```
-WebSocket upgrade requested for: /edge/ws?edge_agent_id=edge_13106781670
-Edge agent edge_13106781670 connected
+WebSocket upgrade requested for: /edge/ws?edge_agent_id=edge_13238407486
+Edge agent edge_13238407486 connected
 Active connections: 1
 ```
 
@@ -182,7 +182,7 @@ You can test the WebSocket endpoint from command line:
 npm install -g wscat
 
 # Test connection
-wscat -c "wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13106781670" \
+wscat -c "wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486" \
   -H "Authorization: Bearer 74a0e606d739d31eda5dafb6f7e0f345d4756df0fe908282715174fd8978e261"
 ```
 

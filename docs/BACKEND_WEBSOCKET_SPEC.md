@@ -50,7 +50,7 @@ wss://your-backend.railway.app/edge/ws
 ### Query Parameters
 
 - **`edge_agent_id`** (required): The unique identifier for this edge agent
-  - Example: `edge_13106781670`
+  - Example: `edge_13238407486`
   - Set after successful registration via `/edge/register`
 
 ### Headers
@@ -62,11 +62,11 @@ wss://your-backend.railway.app/edge/ws
 ### Example Connection
 
 ```
-wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13106781670
+wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486
 
 Headers:
   Authorization: Bearer 74a0e606d739d31eda5dafb6f7e0f345d4756df0fe908282715174fd8978e261
-  X-Edge-Agent-Id: edge_13106781670
+  X-Edge-Agent-Id: edge_13238407486
 ```
 
 ## Message Protocol
@@ -313,17 +313,17 @@ Suggested limits per edge agent:
 
 **Log on connection:**
 ```
-[INFO] Edge agent edge_13106781670 connected from IP 1.2.3.4
+[INFO] Edge agent edge_13238407486 connected from IP 1.2.3.4
 ```
 
 **Log on command sent:**
 ```
-[INFO] Sent command cmd_1234567890 to edge_13106781670 (type: send_message)
+[INFO] Sent command cmd_1234567890 to edge_13238407486 (type: send_message)
 ```
 
 **Log on disconnection:**
 ```
-[WARN] Edge agent edge_13106781670 disconnected (duration: 3600s)
+[WARN] Edge agent edge_13238407486 disconnected (duration: 3600s)
 ```
 
 ## Implementation Checklist
@@ -503,7 +503,7 @@ const httpServer = createServer(app);
 const wsServer = new EdgeWebSocketServer(httpServer);
 
 // Send command to edge agent
-wsServer.sendCommand('edge_13106781670', {
+wsServer.sendCommand('edge_13238407486', {
   command_id: 'cmd_123',
   command_type: 'send_message',
   parameters: {

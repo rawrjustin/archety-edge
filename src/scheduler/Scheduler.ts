@@ -28,6 +28,9 @@ export class Scheduler {
   private transport: IMessageTransport;
   private checkInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
+  private adaptiveMode: boolean = true; // Phase 3: Adaptive scheduling
+  private maxCheckIntervalMs: number = 60000; // Max 60s between checks
+  private checkBufferMs: number = 100; // Check 100ms before message is due
 
   constructor(
     dbPath: string,
@@ -101,6 +104,12 @@ export class Scheduler {
 
     this.logger.info(`Scheduled message ${id} for ${sendAt.toISOString()}`);
 
+    // Reschedule next check if in adaptive mode and scheduler is running
+    // This ensures newly added messages don't wait for the current timeout
+    if (this.adaptiveMode && this.isRunning) {
+      this.scheduleNextCheck();
+    }
+
     return id;
   }
 
@@ -158,24 +167,114 @@ export class Scheduler {
   }
 
   /**
+   * Get the next pending message time (for adaptive scheduling)
+   */
+  private getNextMessageTime(): Date | null {
+    const stmt = this.db.prepare(`
+      SELECT send_at FROM scheduled_messages
+      WHERE status = 'pending'
+      ORDER BY send_at ASC
+      LIMIT 1
+    `);
+
+    const row = stmt.get() as any;
+    return row ? new Date(row.send_at) : null;
+  }
+
+  /**
+   * Calculate when to check next (adaptive mode)
+   * Returns milliseconds until next check
+   */
+  private calculateNextCheckInterval(): number {
+    const nextMessageTime = this.getNextMessageTime();
+
+    if (!nextMessageTime) {
+      // No pending messages, use max interval
+      return this.maxCheckIntervalMs;
+    }
+
+    const now = new Date();
+    const timeUntilDue = nextMessageTime.getTime() - now.getTime();
+
+    if (timeUntilDue <= 0) {
+      // Message is already due, check immediately
+      return 0;
+    }
+
+    // Check slightly before the message is due (with buffer)
+    const checkTime = Math.max(timeUntilDue - this.checkBufferMs, 0);
+
+    // Cap at max interval to catch any newly added messages
+    return Math.min(checkTime, this.maxCheckIntervalMs);
+  }
+
+  /**
+   * Schedule the next check (adaptive mode)
+   */
+  private scheduleNextCheck(): void {
+    if (!this.isRunning || !this.adaptiveMode) {
+      return;
+    }
+
+    // Clear any existing timeout
+    if (this.checkInterval) {
+      clearTimeout(this.checkInterval);
+      this.checkInterval = null;
+    }
+
+    const intervalMs = this.calculateNextCheckInterval();
+    const nextMessageTime = this.getNextMessageTime();
+
+    // Always use at least a 10ms delay to prevent infinite loops
+    const safeIntervalMs = Math.max(intervalMs, 10);
+
+    if (nextMessageTime) {
+      this.logger.debug(
+        `Next message due at ${nextMessageTime.toISOString()} ` +
+        `(checking in ${Math.round(safeIntervalMs / 1000)}s)`
+      );
+    } else {
+      this.logger.debug(
+        `No pending messages, checking again in ${Math.round(safeIntervalMs / 1000)}s`
+      );
+    }
+
+    this.checkInterval = setTimeout(() => {
+      this.checkAndSendMessages();
+    }, safeIntervalMs);
+  }
+
+  /**
    * Start the scheduler loop
    */
-  start(checkIntervalSeconds: number = 30): void {
+  start(checkIntervalSeconds: number = 30, adaptiveMode: boolean = true): void {
+    this.adaptiveMode = adaptiveMode;
     if (this.isRunning) {
       this.logger.warn('Scheduler already running');
       return;
     }
 
     this.isRunning = true;
-    this.logger.info(`Starting scheduler (checking every ${checkIntervalSeconds}s)`);
 
-    // Check immediately
-    this.checkAndSendMessages();
+    if (this.adaptiveMode) {
+      this.logger.info('🚀 Starting scheduler in ADAPTIVE mode (Phase 3)');
+      this.logger.info(`   → Near-instant delivery (<100ms of scheduled time)`);
+      this.logger.info(`   → Max check interval: ${this.maxCheckIntervalMs / 1000}s`);
 
-    // Then check on interval
-    this.checkInterval = setInterval(() => {
+      // Check immediately for any due messages
       this.checkAndSendMessages();
-    }, checkIntervalSeconds * 1000);
+    } else {
+      // Legacy fixed-interval mode
+      this.logger.info(`Starting scheduler in fixed-interval mode (checking every ${checkIntervalSeconds}s)`);
+
+      // Check immediately
+      this.checkAndSendMessages();
+
+      // Then check on fixed interval
+      this.checkInterval = setInterval(() => {
+        this.checkAndSendMessages();
+      }, checkIntervalSeconds * 1000);
+    }
   }
 
   /**
@@ -190,7 +289,11 @@ export class Scheduler {
     this.isRunning = false;
 
     if (this.checkInterval) {
-      clearInterval(this.checkInterval);
+      if (this.adaptiveMode) {
+        clearTimeout(this.checkInterval);
+      } else {
+        clearInterval(this.checkInterval);
+      }
       this.checkInterval = null;
     }
   }
@@ -221,6 +324,10 @@ export class Scheduler {
       const rows = stmt.all(now.toISOString()) as any[];
 
       if (rows.length === 0) {
+        // No messages due, schedule next check (adaptive mode)
+        if (this.adaptiveMode) {
+          this.scheduleNextCheck();
+        }
         return;
       }
 
@@ -249,8 +356,18 @@ export class Scheduler {
         const message = this.rowToMessage(row);
         await this.executeSendMessage(message);
       }
+
+      // After sending messages, schedule next check (adaptive mode)
+      if (this.adaptiveMode) {
+        this.scheduleNextCheck();
+      }
     } catch (error: any) {
       this.logger.error('Error checking scheduled messages:', error.message);
+
+      // Even on error, schedule next check (adaptive mode)
+      if (this.adaptiveMode) {
+        this.scheduleNextCheck();
+      }
     }
   }
 

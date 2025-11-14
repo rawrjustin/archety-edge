@@ -155,7 +155,7 @@ this.ws = new WebSocket(wsUrl, {
 
 **Credentials:**
 - Secret: From `EDGE_SECRET` environment variable
-- Edge Agent ID: `edge_13106781670`
+- Edge Agent ID: `edge_13238407486`
 
 ---
 
@@ -165,7 +165,7 @@ this.ws = new WebSocket(wsUrl, {
 |----------|---------------------|-------------------|--------|
 | Unknown message type | Log warning, continue | `WebSocketClient.ts:167` | ✅ |
 | Command execution failure | Send `command_ack` with `status: "failed"` | `index.ts:434-436` | ✅ |
-| Connection loss | Reconnect automatically | `WebSocketClient.ts:210-226` with exponential backoff | ✅ |
+| Connection loss | Reconnect automatically | `WebSocketClient.ts:222-225` with exponential backoff (unlimited retries) | ✅ |
 
 ---
 
@@ -304,7 +304,7 @@ Send a test command:
     "timestamp": "2025-11-06T00:30:00Z",
     "priority": "immediate",
     "payload": {
-      "thread_id": "+13106781670",
+      "thread_id": "+13238407486",
       "message_text": "Test from WebSocket!",
       "send_at": "2025-11-06T00:30:05Z",
       "is_group": false

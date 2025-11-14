@@ -243,17 +243,23 @@ REGISTRATION_TOKEN=your_registration_token
 
 ## Roadmap
 
-### Implemented ✅
+### MVP Complete ✅
 - Phase 1: Basic message relay
 - Phase 2: Scheduler + Transport
+- **Phase 3: Adaptive Scheduler** - Near-instant delivery (<20ms precision)
 - Performance optimizations (5× faster sends, 60% less CPU)
-- Fast reflex responses
+- Fast reflex responses (1s message detection)
 - Batch AppleScript execution
+- WebSocket real-time commands
+- Production-ready with LaunchDaemon auto-start
 
-### Future 🚀
-- **Adaptive Scheduler** - Near-instant scheduled message delivery
-- **Native Swift Bridge** - 10× faster message sending
-- **Event-Driven Architecture** - Zero-latency message detection
+**Status:** Feature-complete and ready for production use
+
+### Future Considerations (V2)
+Future versions may explore:
+- Native Swift/Objective-C bridge for direct macOS API access
+- Event-driven message detection (FSEvents or notifications)
+- Enhanced monitoring and metrics endpoints
 
 ## License
 

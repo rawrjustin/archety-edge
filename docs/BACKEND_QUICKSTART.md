@@ -165,7 +165,7 @@ app.post('/api/send-message', async (req, res) => {
 ## Authentication
 
 Edge agent sends:
-- **Query param:** `edge_agent_id` (e.g., `edge_13106781670`)
+- **Query param:** `edge_agent_id` (e.g., `edge_13238407486`)
 - **Header:** `Authorization: Bearer {EDGE_SECRET}`
 - **Header:** `X-Edge-Agent-Id: {edge_agent_id}`
 
@@ -188,7 +188,7 @@ You'll see connection attempts every few seconds.
 Once you deploy, you should see in edge agent logs:
 
 ```
-[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13106781670
+[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486
 [INFO] ✅ WebSocket connected - real-time mode enabled
 [INFO] 🔌 WebSocket connected - real-time command delivery enabled
 ```
@@ -198,11 +198,11 @@ Once you deploy, you should see in edge agent logs:
 Send a command via WebSocket:
 
 ```typescript
-sendCommandToEdge('edge_13106781670', {
+sendCommandToEdge('edge_13238407486', {
   command_id: 'test_001',
   command_type: 'schedule_message',
   payload: {
-    thread_id: '+13106781670',
+    thread_id: '+13238407486',
     message_text: 'Test message from WebSocket!',
     send_at: new Date(Date.now() + 5000).toISOString() // 5 seconds from now
   }

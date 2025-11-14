@@ -22,7 +22,7 @@
 ```yaml
 websocket:
   enabled: true                    # Enable/disable WebSocket
-  reconnect_attempts: 10          # Max reconnection attempts
+  reconnect_attempts: 10          # DEPRECATED: WebSocket now retries indefinitely
   ping_interval_seconds: 30       # Keepalive frequency
 ```
 
@@ -34,7 +34,7 @@ websocket:
 ### ✅ Working
 - Edge agent attempts WebSocket connection to backend
 - Falls back to HTTP polling (15s interval) when WebSocket unavailable
-- Auto-reconnects with exponential backoff
+- Auto-reconnects with exponential backoff (unlimited retries, 1s → 60s max delay)
 - System remains fully operational via HTTP fallback
 - Correct backend URL: `wss://archety-backend-production.up.railway.app/edge/ws`
 
@@ -45,7 +45,7 @@ websocket:
 ## Testing Results
 
 ```
-[2025-11-05T20:35:13.500Z] [INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13106781670
+[2025-11-05T20:35:13.500Z] [INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486
 [2025-11-05T20:35:13.713Z] [ERROR] WebSocket error: ["Unexpected server response: 403"]
 [2025-11-05T20:35:13.714Z] [WARN] 🔌 WebSocket disconnected - falling back to HTTP polling
 [2025-11-05T20:35:13.717Z] [WARN] ⚠️  WebSocket connection failed - falling back to HTTP polling
@@ -181,7 +181,7 @@ function sendCommand(edgeAgentId, command) {
 ```
 [WARN] 🔌 WebSocket disconnected - falling back to HTTP polling
 [INFO] Command delivery: HTTP polling every 15s
-[INFO] Scheduling WebSocket reconnect attempt N/10 in Xms
+[INFO] Scheduling WebSocket reconnect attempt #N in Xms (unlimited retries)
 ```
 
 **Command Received via WebSocket:**

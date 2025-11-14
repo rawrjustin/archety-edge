@@ -94,7 +94,7 @@ Added comprehensive logging to track every message flowing through the edge agen
    Priority: immediate
    Timestamp: 2025-11-06T00:45:00Z
    Payload: {
-     "thread_id": "+13106781670",
+     "thread_id": "+13238407486",
      "message_text": "Reminder: Call the dentist!",
      "send_at": "2025-11-06T14:00:00Z",
      "is_group": false
@@ -145,7 +145,7 @@ Or if failed:
 ============================================================
 🔔 SENDING SCHEDULED MESSAGE
    Schedule ID: abc-123-def
-   Thread: iMessage;-;+13106781670
+   Thread: iMessage;-;+13238407486
    Scheduled for: 2025-11-06T14:00:00Z
    Text: "Reminder: Call the dentist!"
    Command ID: cmd_1234567890
