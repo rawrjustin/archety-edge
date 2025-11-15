@@ -53,7 +53,20 @@
       "Bash(env)",
       "Bash(BACKEND_URL=https://archety-backend-production.up.railway.app node:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(if [ -f .env ])",
+      "Bash(then echo \"✓ .env file exists\")",
+      "Bash(else echo \"✗ .env file not found - please create it from .env.example\")",
+      "Bash(fi)",
+      "Bash(unset BACKEND_URL)",
+      "Bash(for file in \"./docs/WEBSOCKET_IMPLEMENTATION_SUMMARY.md\" \"./docs/BACKEND_QUICKSTART.md\" \"./docs/LOGGING_ENHANCEMENTS.md\")",
+      "Bash(do sed -i '' 's/13106781670/13238407486/g' \"$file\")",
+      "Bash(done)",
+      "Bash(npx ts-node:*)",
+      "Bash(open \"x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles\")",
+      "Bash(/Users/sage1/Code/edge-relay/edge-agent.sh status:*)",
+      "Bash(/Users/sage1/Code/edge-relay/edge-agent.sh start:*)",
+      "Bash(launchctl print:*)"
     ],
     "deny": [],
     "ask": []

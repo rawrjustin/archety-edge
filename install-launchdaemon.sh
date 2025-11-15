@@ -51,6 +51,10 @@ fi
 
 echo "Using node at: $NODE_PATH"
 
+# Get the user's home directory
+USER_HOME=$(eval echo "~$REAL_USER")
+echo "User home directory: $USER_HOME"
+
 # Create plist file
 cat > "$PLIST_DEST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -80,6 +84,8 @@ cat > "$PLIST_DEST" << EOF
         <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>NODE_ENV</key>
         <string>production</string>
+        <key>HOME</key>
+        <string>$USER_HOME</string>
     </dict>
 </dict>
 </plist>
