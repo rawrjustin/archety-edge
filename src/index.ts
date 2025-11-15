@@ -36,6 +36,7 @@ class EdgeAgent {
   private pendingEvents: EdgeEventWrapper[] = [];
   private lastCommandId: string | null = null;
   private useWebSocket: boolean = true; // Enable WebSocket by default
+  private wsReflexSent: Map<string, { text: string; timestamp: number }> = new Map(); // Track WebSocket-sent reflex messages
 
   constructor() {
     // Load configuration
@@ -90,7 +91,7 @@ class EdgeAgent {
     this.planManager = new PlanManager(plansDbPath, this.logger);
 
     // Initialize command handler
-    this.commandHandler = new CommandHandler(this.scheduler, this.logger, this.ruleEngine, this.planManager);
+    this.commandHandler = new CommandHandler(this.scheduler, this.transport, this.logger, this.ruleEngine, this.planManager);
 
     // Set up WebSocket callbacks
     this.wsClient.onCommand(async (command) => {
@@ -313,23 +314,38 @@ class EdgeAgent {
         }
         // Legacy multi-bubble response
         else if (response.reply_bubbles && response.reply_bubbles.length > 0) {
-          this.logger.info('-'.repeat(60));
-          this.logger.info(`📤 SENDING ${response.reply_bubbles.length} BUBBLES to ${message.threadId}`);
-          for (let i = 0; i < response.reply_bubbles.length; i++) {
-            this.logger.info(`   [${i + 1}/${response.reply_bubbles.length}]: "${response.reply_bubbles[i]}"`);
+          // Check if first bubble was already sent via WebSocket as reflex
+          const wsReflex = this.wsReflexSent.get(message.threadId);
+          let bubblesToSend = response.reply_bubbles;
+
+          if (wsReflex && response.reply_bubbles[0] === wsReflex.text) {
+            // Skip first bubble - already sent via WebSocket
+            bubblesToSend = response.reply_bubbles.slice(1);
+            this.logger.info('⏭️  Skipping first bubble (already sent via WebSocket reflex)');
+            this.wsReflexSent.delete(message.threadId); // Clean up tracking
           }
-          this.logger.info('-'.repeat(60));
 
-          const sent = await this.transport.sendMultiBubble(
-            message.threadId,
-            response.reply_bubbles,
-            message.isGroup
-          );
-
-          if (sent) {
-            this.logger.info('✅ All bubbles DELIVERED to iMessage');
+          if (bubblesToSend.length === 0) {
+            this.logger.info('ℹ️  All bubbles already sent via WebSocket');
           } else {
-            this.logger.error('❌ FAILED to deliver bubbles to iMessage');
+            this.logger.info('-'.repeat(60));
+            this.logger.info(`📤 SENDING ${bubblesToSend.length} BUBBLES to ${message.threadId}`);
+            for (let i = 0; i < bubblesToSend.length; i++) {
+              this.logger.info(`   [${i + 1}/${bubblesToSend.length}]: "${bubblesToSend[i]}"`);
+            }
+            this.logger.info('-'.repeat(60));
+
+            const sent = await this.transport.sendMultiBubble(
+              message.threadId,
+              bubblesToSend,
+              message.isGroup
+            );
+
+            if (sent) {
+              this.logger.info('✅ All bubbles DELIVERED to iMessage');
+            } else {
+              this.logger.error('❌ FAILED to deliver bubbles to iMessage');
+            }
           }
         }
         // Legacy single bubble
@@ -442,6 +458,23 @@ class EdgeAgent {
 
       // Execute command
       const result = await this.commandHandler.executeCommand(command);
+
+      // Track WebSocket-sent reflex messages (for skipping duplicates in HTTP response)
+      if (result.success && command.command_type === 'send_message_now') {
+        const payload = command.payload;
+        if (payload.bubble_type === 'reflex') {
+          this.wsReflexSent.set(payload.thread_id, {
+            text: payload.text,
+            timestamp: Date.now()
+          });
+          this.logger.info(`📝 Tracked WebSocket reflex for ${payload.thread_id}: "${payload.text}"`);
+
+          // Auto-cleanup after 10 seconds to prevent memory leak
+          setTimeout(() => {
+            this.wsReflexSent.delete(payload.thread_id);
+          }, 10000);
+        }
+      }
 
       // Update last command ID
       this.lastCommandId = command.command_id;

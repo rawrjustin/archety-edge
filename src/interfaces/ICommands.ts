@@ -37,11 +37,21 @@ export interface UpdatePlanCommand {
   };
 }
 
+export interface SendMessageNowCommand {
+  command_type: 'send_message_now';
+  payload: {
+    thread_id: string;
+    text: string;
+    bubble_type?: 'reflex' | 'burst' | 'normal';
+  };
+}
+
 export type EdgeCommand =
   | ScheduleMessageCommand
   | CancelScheduledCommand
   | SetRuleCommand
-  | UpdatePlanCommand;
+  | UpdatePlanCommand
+  | SendMessageNowCommand;
 
 export interface EdgeCommandWrapper {
   command_id: string;

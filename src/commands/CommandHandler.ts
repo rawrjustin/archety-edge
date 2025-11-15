@@ -5,10 +5,12 @@ import {
   ScheduleMessageCommand,
   CancelScheduledCommand,
   SetRuleCommand,
-  UpdatePlanCommand
+  UpdatePlanCommand,
+  SendMessageNowCommand
 } from '../interfaces/ICommands';
 import { RuleEngine, Rule } from '../rules/RuleEngine';
 import { PlanManager } from '../plans/PlanManager';
+import { IMessageTransport } from '../interfaces/IMessageTransport';
 
 /**
  * CommandHandler - Processes commands from backend
@@ -16,11 +18,19 @@ import { PlanManager } from '../plans/PlanManager';
 export class CommandHandler {
   private logger: ILogger;
   private scheduler: Scheduler;
+  private transport: IMessageTransport;
   private ruleEngine: RuleEngine | null = null;
   private planManager: PlanManager | null = null;
 
-  constructor(scheduler: Scheduler, logger: ILogger, ruleEngine?: RuleEngine, planManager?: PlanManager) {
+  constructor(
+    scheduler: Scheduler,
+    transport: IMessageTransport,
+    logger: ILogger,
+    ruleEngine?: RuleEngine,
+    planManager?: PlanManager
+  ) {
     this.scheduler = scheduler;
+    this.transport = transport;
     this.logger = logger;
     this.ruleEngine = ruleEngine || null;
     this.planManager = planManager || null;
@@ -35,6 +45,9 @@ export class CommandHandler {
       this.logger.info(`Executing command ${command.command_id}: ${command.command_type}`);
 
       switch (command.command_type) {
+        case 'send_message_now':
+          return await this.handleSendMessageNow(command);
+
         case 'schedule_message':
           return await this.handleScheduleMessage(command);
 
@@ -59,6 +72,59 @@ export class CommandHandler {
       return {
         success: false,
         error: error.message
+      };
+    }
+  }
+
+  /**
+   * Handle send_message_now command (for instant reflex delivery via WebSocket)
+   */
+  private async handleSendMessageNow(
+    command: EdgeCommandWrapper
+  ): Promise<{ success: boolean; error?: string }> {
+    const payload = command.payload as SendMessageNowCommand['payload'];
+
+    try {
+      // Validate payload
+      if (!payload.thread_id || !payload.text) {
+        return {
+          success: false,
+          error: 'Missing required fields: thread_id and text'
+        };
+      }
+
+      // Parse thread_id to determine if it's a group chat
+      const isGroup = payload.thread_id.includes('chat');
+
+      // Log the immediate send
+      const bubbleType = payload.bubble_type || 'normal';
+      this.logger.info('='.repeat(60));
+      this.logger.info(`⚡ SENDING ${bubbleType.toUpperCase()} MESSAGE IMMEDIATELY via WebSocket`);
+      this.logger.info(`   Thread: ${payload.thread_id}`);
+      this.logger.info(`   Text: "${payload.text}"`);
+      this.logger.info(`   Type: ${bubbleType}`);
+      this.logger.info('='.repeat(60));
+
+      // Send immediately via transport
+      const sent = await this.transport.sendMessage(
+        payload.thread_id,
+        payload.text,
+        isGroup
+      );
+
+      if (sent) {
+        this.logger.info(`✅ ${bubbleType.toUpperCase()} message DELIVERED to iMessage via WebSocket`);
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: 'Failed to send message via transport'
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: `Failed to send message now: ${error.message}`
       };
     }
   }
