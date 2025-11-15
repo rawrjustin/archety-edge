@@ -19,7 +19,7 @@ describe('CommandHandler', () => {
     mockLogger = new MockLogger();
     mockTransport = new MockTransport();
     scheduler = new Scheduler(testDbPath, mockTransport, mockLogger);
-    commandHandler = new CommandHandler(scheduler, mockLogger);
+    commandHandler = new CommandHandler(scheduler, mockTransport, mockLogger);
   });
 
   afterEach(() => {
@@ -135,7 +135,7 @@ describe('CommandHandler', () => {
       const result = await commandHandler.executeCommand(command);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Rule engine not yet implemented');
+      expect(result.error).toBe('Rule engine not initialized');
     });
 
     it('should handle update_plan command (not implemented)', async () => {
@@ -151,7 +151,7 @@ describe('CommandHandler', () => {
       const result = await commandHandler.executeCommand(command);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Plan updates not yet implemented');
+      expect(result.error).toBe('Plan manager not initialized');
     });
 
     it('should handle unknown command type', async () => {
@@ -347,13 +347,16 @@ describe('CommandHandler', () => {
       const command: EdgeCommandWrapper = {
         command_id: 'cmd_unimplemented',
         command_type: 'set_rule',
-        payload: {}
+        payload: {
+          rule_type: 'auto_reply',
+          rule_config: {}
+        }
       };
 
       await commandHandler.executeCommand(command);
 
-      expect(mockLogger.infoMessages.some(msg =>
-        msg.includes('set_rule command received')
+      expect(mockLogger.warnMessages.some(msg =>
+        msg.includes('set_rule command received but rule engine not initialized')
       )).toBe(true);
     });
 

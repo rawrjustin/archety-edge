@@ -35,7 +35,7 @@ describe('CommandHandler Integration', () => {
     scheduler = new Scheduler(schedulerDbPath, mockTransport, logger);
     ruleEngine = new RuleEngine(rulesDbPath, logger);
     planManager = new PlanManager(plansDbPath, logger);
-    commandHandler = new CommandHandler(scheduler, logger, ruleEngine, planManager);
+    commandHandler = new CommandHandler(scheduler, mockTransport, logger, ruleEngine, planManager);
   });
 
   afterEach(() => {
