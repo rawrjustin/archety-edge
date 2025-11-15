@@ -55,6 +55,51 @@ echo "Using node at: $NODE_PATH"
 USER_HOME=$(eval echo "~$REAL_USER")
 echo "User home directory: $USER_HOME"
 
+# Load environment variables from .env file
+echo "Loading environment variables from .env..."
+if [ ! -f "$PROJECT_DIR/.env" ]; then
+    echo "Error: .env file not found at $PROJECT_DIR/.env"
+    echo "Please create .env file with required variables:"
+    echo "  EDGE_SECRET=..."
+    echo "  RELAY_WEBHOOK_SECRET=..."
+    echo "  BACKEND_URL=..."
+    echo "  USER_PHONE=..."
+    exit 1
+fi
+
+# Read .env and extract variables (simple parsing - ignores comments and blank lines)
+EDGE_SECRET=$(grep "^EDGE_SECRET=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
+RELAY_WEBHOOK_SECRET=$(grep "^RELAY_WEBHOOK_SECRET=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
+BACKEND_URL=$(grep "^BACKEND_URL=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
+USER_PHONE=$(grep "^USER_PHONE=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
+
+# Validate required variables
+if [ -z "$EDGE_SECRET" ]; then
+    echo "Error: EDGE_SECRET not found in .env"
+    exit 1
+fi
+
+if [ -z "$RELAY_WEBHOOK_SECRET" ]; then
+    echo "Error: RELAY_WEBHOOK_SECRET not found in .env"
+    exit 1
+fi
+
+if [ -z "$BACKEND_URL" ]; then
+    echo "Error: BACKEND_URL not found in .env"
+    exit 1
+fi
+
+if [ -z "$USER_PHONE" ]; then
+    echo "Error: USER_PHONE not found in .env"
+    exit 1
+fi
+
+echo "Environment variables loaded:"
+echo "  EDGE_SECRET: ${EDGE_SECRET:0:20}..."
+echo "  RELAY_WEBHOOK_SECRET: ${RELAY_WEBHOOK_SECRET:0:20}..."
+echo "  BACKEND_URL: $BACKEND_URL"
+echo "  USER_PHONE: $USER_PHONE"
+
 # Create plist file
 cat > "$PLIST_DEST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -86,6 +131,14 @@ cat > "$PLIST_DEST" << EOF
         <string>production</string>
         <key>HOME</key>
         <string>$USER_HOME</string>
+        <key>EDGE_SECRET</key>
+        <string>$EDGE_SECRET</string>
+        <key>RELAY_WEBHOOK_SECRET</key>
+        <string>$RELAY_WEBHOOK_SECRET</string>
+        <key>BACKEND_URL</key>
+        <string>$BACKEND_URL</string>
+        <key>USER_PHONE</key>
+        <string>$USER_PHONE</string>
     </dict>
 </dict>
 </plist>

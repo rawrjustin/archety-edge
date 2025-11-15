@@ -7,7 +7,7 @@
 import { loadConfig, validateConfig } from './config';
 import { Logger } from './utils/logger';
 import { AppleScriptTransport } from './transports/AppleScriptTransport';
-import { RenderClient } from './backend/RenderClient';
+import { RailwayClient } from './backend/RailwayClient';
 import { WebSocketClient } from './backend/WebSocketClient';
 import { Scheduler } from './scheduler/Scheduler';
 import { CommandHandler } from './commands/CommandHandler';
@@ -23,7 +23,7 @@ class EdgeAgent {
   private config: any;
   private logger: Logger;
   private transport: AppleScriptTransport;
-  private backend: RenderClient;
+  private backend: RailwayClient;
   private wsClient: WebSocketClient;
   private scheduler: Scheduler;
   private ruleEngine: RuleEngine;
@@ -54,22 +54,26 @@ class EdgeAgent {
       this.logger
     );
 
-    // Initialize backend client
-    const secret = process.env.EDGE_SECRET;
-    if (!secret) {
-      throw new Error('EDGE_SECRET environment variable is required');
+    // Initialize backend client (Railway with Bearer auth)
+    const relaySecret = process.env.RELAY_WEBHOOK_SECRET;
+    if (!relaySecret) {
+      throw new Error('RELAY_WEBHOOK_SECRET environment variable is required');
     }
-    this.backend = new RenderClient(
+    this.backend = new RailwayClient(
       this.config.backend.url,
       this.config.edge.user_phone,
-      secret,
+      relaySecret,
       this.logger
     );
 
-    // Initialize WebSocket client
+    // Initialize WebSocket client (uses EDGE_SECRET for auth)
+    const edgeSecret = process.env.EDGE_SECRET;
+    if (!edgeSecret) {
+      throw new Error('EDGE_SECRET environment variable is required for WebSocket');
+    }
     this.wsClient = new WebSocketClient(
       this.config.backend.url,
-      secret,
+      edgeSecret,
       this.logger
     );
 

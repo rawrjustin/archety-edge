@@ -90,10 +90,7 @@ export class RenderClient implements IBackendClient {
 
       const response = await this.client.post('/edge/register', {
         user_phone: this.userPhone,
-        apple_id: null, // Optional
-        version: '2.0.0',
-        capabilities: ['transport', 'scheduler'], // Phase 2: transport + scheduler
-        auth_token: registrationToken
+        registration_token: registrationToken
       });
 
       const { edge_agent_id } = response.data;

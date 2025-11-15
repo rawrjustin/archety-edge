@@ -66,7 +66,11 @@
       "Bash(open \"x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles\")",
       "Bash(/Users/sage1/Code/edge-relay/edge-agent.sh status:*)",
       "Bash(/Users/sage1/Code/edge-relay/edge-agent.sh start:*)",
-      "Bash(launchctl print:*)"
+      "Bash(launchctl print:*)",
+      "Bash(sudo launchctl kickstart:*)",
+      "Bash(node:*)",
+      "Bash(BACKEND_URL=https://archety-backend-dev.up.railway.app node:*)",
+      "Bash(/Users/sage1/Code/edge-relay/status.sh)"
     ],
     "deny": [],
     "ask": []
