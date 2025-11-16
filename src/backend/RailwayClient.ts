@@ -10,7 +10,7 @@ import { ILogger } from '../interfaces/ILogger';
  *
  * Updated November 2025 for new backend architecture:
  * - Bearer token authentication (RELAY_WEBHOOK_SECRET)
- * - /orchestrator/message endpoint
+ * - /edge/message endpoint (WebSocket-aware)
  * - No registration needed
  * - Rate limiting support (429 handling)
  */
@@ -89,29 +89,14 @@ export class RailwayClient implements IBackendClient {
 
   /**
    * Send a message to the backend for processing
-   * Uses the new /orchestrator/message endpoint with Bearer auth
+   * Uses the /edge/message endpoint with Bearer auth (WebSocket-aware)
    */
   async sendMessage(request: BackendMessageRequest): Promise<BackendMessageResponse> {
     const requestId = `msg_${Date.now()}`;
     const textPreview = request.filtered_text.substring(0, 50);
 
-    this.logger.info(`[${requestId}] 📤 Sending message to orchestrator from ${request.sender}`);
+    this.logger.info(`[${requestId}] 📤 Sending message to backend from ${request.sender}`);
     this.logger.debug(`[${requestId}] Text preview: ${textPreview}`);
-
-    // Transform old request format to new orchestrator format
-    const orchestratorPayload = {
-      chat_guid: request.thread_id,
-      mode: "direct",
-      sender: request.sender,
-      text: request.filtered_text,
-      timestamp: Math.floor(new Date(request.original_timestamp).getTime() / 1000),
-      participants: request.participants || [request.sender],
-      metadata: {
-        is_first_message: false,
-        mentioned_sage: false,
-        has_attachment: false
-      }
-    };
 
     const maxRetries = 2;
     let lastError: any = null;
@@ -120,10 +105,10 @@ export class RailwayClient implements IBackendClient {
       const startTime = Date.now();
       const startTimestamp = new Date().toISOString();
 
-      this.logger.info(`[${requestId}] 🔄 POST /orchestrator/message attempt ${attempt} started at ${startTimestamp}`);
+      this.logger.info(`[${requestId}] 🔄 POST /edge/message attempt ${attempt} started at ${startTimestamp}`);
 
       try {
-        const response = await this.client.post('/orchestrator/message', orchestratorPayload);
+        const response = await this.client.post('/edge/message', request);
         const duration = Date.now() - startTime;
         const endTimestamp = new Date().toISOString();
 
