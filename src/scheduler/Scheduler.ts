@@ -167,6 +167,28 @@ export class Scheduler {
   }
 
   /**
+   * Get all scheduled messages (for admin interface)
+   */
+  getAllScheduled(): ScheduledMessage[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM scheduled_messages
+      ORDER BY created_at DESC
+      LIMIT 100
+    `);
+
+    const rows = stmt.all() as any[];
+
+    return rows.map(row => this.rowToMessage(row));
+  }
+
+  /**
+   * Cancel a scheduled message (alias for cancelMessage for admin interface)
+   */
+  cancel(scheduleId: string): boolean {
+    return this.cancelMessage(scheduleId);
+  }
+
+  /**
    * Get the next pending message time (for adaptive scheduling)
    */
   private getNextMessageTime(): Date | null {

@@ -18,7 +18,13 @@
     "service:status": "sudo launchctl list | grep edge-agent || echo 'Service not running'",
     "service:logs": "tail -f logs/edge-agent.out.log",
     "service:errors": "tail -f logs/edge-agent.err.log",
-    "service:restart": "npm run service:uninstall && npm run service:install"
+    "service:restart": "npm run service:uninstall && npm run service:install",
+    "admin:install": "cd admin-portal/client && npm install",
+    "admin:build": "npm run build && cd admin-portal/client && npm run build",
+    "admin:dev:server": "ts-node admin-portal/server/index.ts",
+    "admin:dev:client": "cd admin-portal/client && npm start",
+    "admin:start": "npm run admin:build && node dist/admin-portal/server/index.js",
+    "admin": "npm run admin:build && node dist/admin-portal/server/index.js"
   },
   "keywords": [
     "imessage",
@@ -29,14 +35,19 @@
   "license": "MIT",
   "dependencies": {
     "@types/better-sqlite3": "^7.6.11",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.9",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
     "axios": "^1.7.2",
     "better-sqlite3": "^11.1.2",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "express": "^4.18.2",
     "js-yaml": "^4.1.0",
+    "tail": "^2.2.6",
     "typescript": "^5.5.3",
     "uuid": "^10.0.0",
     "ws": "^8.18.3"

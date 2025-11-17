@@ -153,6 +153,42 @@ export class RuleEngine {
   }
 
   /**
+   * Enable a rule
+   */
+  enableRule(ruleId: string): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE rules SET enabled = 1, updated_at = ?
+      WHERE rule_id = ?
+    `);
+    const result = stmt.run(new Date().toISOString(), ruleId);
+
+    if (result.changes > 0) {
+      this.logger.info(`Rule ${ruleId} enabled`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Disable a rule
+   */
+  disableRule(ruleId: string): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE rules SET enabled = 0, updated_at = ?
+      WHERE rule_id = ?
+    `);
+    const result = stmt.run(new Date().toISOString(), ruleId);
+
+    if (result.changes > 0) {
+      this.logger.info(`Rule ${ruleId} disabled`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Delete a rule
    */
   deleteRule(ruleId: string): boolean {

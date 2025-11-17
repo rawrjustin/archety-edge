@@ -576,6 +576,98 @@ class EdgeAgent {
 
     this.logger.info('✅ Edge Agent stopped');
   }
+
+  // ====================
+  // Admin Interface API
+  // ====================
+
+  /**
+   * Get current stats for admin dashboard
+   */
+  async getAdminStats(): Promise<any> {
+    const stats = this.scheduler.getStats();
+    const uptimeSeconds = Math.floor((new Date().getTime() - this.startTime.getTime()) / 1000);
+    const activeRules = this.commandHandler.getActiveRulesCount();
+
+    return {
+      uptime_seconds: uptimeSeconds,
+      scheduled_messages: stats.pending,
+      active_rules: activeRules,
+      websocket_connected: this.wsClient.isConnected(),
+      http_fallback_active: this.syncInterval !== null,
+      messages_processed: stats.sent + stats.failed, // Total processed
+      messages_sent: stats.sent,
+      last_message_time: null, // Could track this if needed
+      edge_agent_id: this.backend.getEdgeAgentId(),
+      backend_url: this.config.backend.url,
+      imessage_poll_interval: this.config.imessage.poll_interval_seconds,
+      performance_profile: this.config.performance?.profile || 'balanced',
+    };
+  }
+
+  /**
+   * Get all scheduled messages
+   */
+  async getScheduledMessages(): Promise<any[]> {
+    return this.scheduler.getAllScheduled();
+  }
+
+  /**
+   * Get all rules
+   */
+  async getRules(): Promise<any[]> {
+    return this.ruleEngine.getAllRules();
+  }
+
+  /**
+   * Get all plans
+   */
+  async getPlans(): Promise<any[]> {
+    return this.planManager.getAllPlans();
+  }
+
+  /**
+   * Cancel a scheduled message
+   */
+  async cancelScheduledMessage(scheduleId: string): Promise<void> {
+    this.logger.info(`Admin: Cancelling scheduled message ${scheduleId}`);
+    await this.scheduler.cancel(scheduleId);
+  }
+
+  /**
+   * Enable a rule
+   */
+  async enableRule(ruleId: string): Promise<void> {
+    this.logger.info(`Admin: Enabling rule ${ruleId}`);
+    await this.ruleEngine.enableRule(ruleId);
+  }
+
+  /**
+   * Disable a rule
+   */
+  async disableRule(ruleId: string): Promise<void> {
+    this.logger.info(`Admin: Disabling rule ${ruleId}`);
+    await this.ruleEngine.disableRule(ruleId);
+  }
+
+  /**
+   * Send a test message
+   */
+  async sendTestMessage(threadId: string, text: string): Promise<void> {
+    this.logger.info(`Admin: Sending test message to ${threadId}`);
+    const isGroup = threadId.includes('chat');
+    await this.transport.sendMessage(threadId, text, isGroup);
+  }
+
+  /**
+   * Test backend connection
+   */
+  async testBackendConnection(): Promise<{ healthy: boolean; latency: number }> {
+    const start = Date.now();
+    const healthy = await this.backend.healthCheck();
+    const latency = Date.now() - start;
+    return { healthy, latency };
+  }
 }
 
 /**

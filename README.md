@@ -40,6 +40,35 @@ npm run build
 
 **See [Getting Started Guide](docs/setup/GETTING_STARTED.md) for detailed setup.**
 
+## 🎛️ Admin Portal
+
+A comprehensive web-based admin portal is now available for managing and monitoring the Edge Agent without SSH or terminal access.
+
+**Quick Start:**
+```bash
+# Install and build
+npm install
+npm run admin:install
+npm run admin:build
+
+# Start with admin portal
+npm run admin
+```
+
+Access at: **http://127.0.0.1:3100**
+
+**Features:**
+- 📊 Real-time dashboard with stats and uptime monitoring
+- 📋 Live log viewer with filtering and streaming
+- ⚙️ Configuration editor for config.yaml
+- 📅 Scheduled messages manager
+- 🎯 Rules manager (enable/disable rules)
+- 🗺️ Conversation plans viewer
+- 🧪 Test tools for debugging and message testing
+- 🔄 Service control (restart from web interface)
+
+See [admin-portal/README.md](./admin-portal/README.md) for full documentation.
+
 ## Management
 
 ### Manual Mode (edge-agent.sh)
