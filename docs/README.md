@@ -16,6 +16,11 @@ Complete documentation for the Edge Relay iMessage agent.
 - [Performance Details](architecture/PERFORMANCE.md) - Optimizations
 - [Reflex Implementation](architecture/REFLEX_IMPLEMENTATION.md) - Fast responses
 
+**Backend Integration:**
+- [Backend WebSocket Correlation](BACKEND_WEBSOCKET_CORRELATION.md) - ⚡ NEW: Instant reflex delivery
+- [Backend Quick Start](BACKEND_QUICKSTART.md) - WebSocket implementation guide
+- [Protocol Status](PROTOCOL_IMPLEMENTATION_STATUS.md) - Implementation checklist
+
 ## Documentation Structure
 
 ```
@@ -58,6 +63,11 @@ docs/
 
 ### I want to implement fast reflexes
 → [Reflex Implementation](architecture/REFLEX_IMPLEMENTATION.md)
+
+### I'm implementing the backend WebSocket
+→ [Backend WebSocket Correlation](BACKEND_WEBSOCKET_CORRELATION.md) - How to correlate HTTP requests with WebSocket connections for instant reflex delivery
+→ [Backend Quick Start](BACKEND_QUICKSTART.md) - Quick start guide for backend developers
+→ [Protocol Implementation Status](PROTOCOL_IMPLEMENTATION_STATUS.md) - Full protocol compliance details
 
 ## Key Concepts
 

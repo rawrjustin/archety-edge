@@ -1,7 +1,7 @@
 # WebSocket Protocol Implementation Status
 
-**Last Updated:** November 6, 2025
-**Status:** ✅ Fully Compliant with Backend Protocol
+**Last Updated:** November 17, 2025
+**Status:** ✅ Fully Compliant with Backend Protocol + Instant Reflex Delivery
 
 ## Protocol Compliance
 
@@ -61,9 +61,11 @@ export interface EdgeCommandWrapper {
 
 | Command Type | Status | Implementation |
 |--------------|--------|----------------|
+| `send_message_now` | ✅ Implemented | `CommandHandler.ts:82-130` - Instant reflex delivery via WebSocket |
 | `schedule_message` | ✅ Implemented | `CommandHandler.ts` - Scheduler integration |
 | `cancel_scheduled` | ✅ Implemented | `CommandHandler.ts` - Cancel via scheduler |
-| `set_rule` | 🔮 Future | Marked for future implementation |
+| `set_rule` | ✅ Implemented | `CommandHandler.ts:145-206` - Rule engine integration |
+| `update_plan` | ✅ Implemented | `CommandHandler.ts:211-252` - Plan manager integration |
 
 ### Priority Handling
 
@@ -154,8 +156,48 @@ this.ws = new WebSocket(wsUrl, {
 ✅ **Fully compliant**
 
 **Credentials:**
-- Secret: From `EDGE_SECRET` environment variable
+- Secret: From `EDGE_SECRET` environment variable (used for BOTH HTTP and WebSocket)
 - Edge Agent ID: `edge_13238407486`
+
+---
+
+## ✅ HTTP/WebSocket Correlation for Instant Reflex Delivery
+
+**New Feature (November 17, 2025):** Backend can now send instant reflex messages via WebSocket
+
+### How It Works
+
+1. **Edge Client Connects WebSocket:**
+   ```
+   wss://backend/edge/ws?edge_agent_id=edge_13238407486
+   Authorization: Bearer {EDGE_SECRET}
+   ```
+
+2. **Edge Client Sends HTTP Request with Correlation Header:**
+   ```http
+   POST /edge/message
+   Authorization: Bearer {EDGE_SECRET}
+   X-Edge-Agent-Id: edge_13238407486  ← NEW: Correlates to WebSocket
+   ```
+
+3. **Backend Correlates HTTP to WebSocket:**
+   - Extracts `X-Edge-Agent-Id` from HTTP header
+   - Looks up WebSocket connection for that edge agent
+   - Sends `send_message_now` command instantly via WebSocket
+
+4. **Edge Client Receives and Sends Reflex Immediately:**
+   - Command arrives via WebSocket in <500ms
+   - Sends to iMessage instantly
+   - HTTP response arrives later with all bubbles
+   - Edge skips first bubble (already sent via WebSocket)
+
+**Implementation:**
+- `src/backend/RailwayClient.ts:113-120` - Adds `X-Edge-Agent-Id` header to HTTP requests
+- `src/commands/CommandHandler.ts:82-130` - Handles `send_message_now` command
+- `src/index.ts:447-462` - Tracks WebSocket-sent reflexes to prevent duplicates
+- `src/index.ts:317-350` - Skips duplicate bubbles in HTTP response
+
+**Documentation:** See `docs/BACKEND_WEBSOCKET_CORRELATION.md` for backend implementation guide
 
 ---
 
@@ -335,10 +377,13 @@ Send a test command:
 
 ## Summary
 
-✅ **Protocol Implementation: 100% Complete**
+✅ **Protocol Implementation: 100% Complete + Instant Reflex Delivery**
 
 - All required message types supported
 - Command structure matches backend exactly
+- **NEW:** `send_message_now` command for instant reflex delivery via WebSocket
+- **NEW:** HTTP/WebSocket correlation via `X-Edge-Agent-Id` header
+- **NEW:** Duplicate message prevention for WebSocket-sent reflexes
 - Acknowledgment format updated to new protocol
 - Priority handling implemented
 - Timestamp support added
@@ -346,7 +391,7 @@ Send a test command:
 - HTTP fallback fully functional
 - Connection management robust
 
-**The edge agent is fully compliant with the backend WebSocket protocol and ready for production use.**
+**The edge agent is fully compliant with the backend WebSocket protocol and supports instant reflex delivery (<500ms) when WebSocket is connected.**
 
 ---
 
