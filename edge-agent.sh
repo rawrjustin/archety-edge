@@ -82,6 +82,11 @@ start() {
         sleep 1
     fi
 
+    # Load environment variables from .env file
+    if [ -f "$SCRIPT_DIR/.env" ]; then
+        export $(cat "$SCRIPT_DIR/.env" | grep -v "^#" | xargs)
+    fi
+
     # Start the agent
     log_info "Starting edge agent..."
 
