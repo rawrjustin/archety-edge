@@ -55,23 +55,19 @@ class EdgeAgent {
       this.logger
     );
 
-    // Initialize backend client (Railway with Bearer auth)
-    const relaySecret = process.env.RELAY_WEBHOOK_SECRET;
-    if (!relaySecret) {
-      throw new Error('RELAY_WEBHOOK_SECRET environment variable is required');
+    // Initialize backend client and WebSocket (both use EDGE_SECRET for auth)
+    const edgeSecret = process.env.EDGE_SECRET;
+    if (!edgeSecret) {
+      throw new Error('EDGE_SECRET environment variable is required');
     }
+
     this.backend = new RailwayClient(
       this.config.backend.url,
       this.config.edge.user_phone,
-      relaySecret,
+      edgeSecret,
       this.logger
     );
 
-    // Initialize WebSocket client (uses EDGE_SECRET for auth)
-    const edgeSecret = process.env.EDGE_SECRET;
-    if (!edgeSecret) {
-      throw new Error('EDGE_SECRET environment variable is required for WebSocket');
-    }
     this.wsClient = new WebSocketClient(
       this.config.backend.url,
       edgeSecret,

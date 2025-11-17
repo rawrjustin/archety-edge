@@ -9,7 +9,7 @@ import { ILogger } from '../interfaces/ILogger';
  * RailwayClient - Backend client for communicating with Sage backend on Railway
  *
  * Updated November 2025 for new backend architecture:
- * - Bearer token authentication (RELAY_WEBHOOK_SECRET)
+ * - Bearer token authentication (EDGE_SECRET - same for HTTP and WebSocket)
  * - /edge/message endpoint (WebSocket-aware)
  * - No registration needed
  * - Rate limiting support (429 handling)
@@ -17,17 +17,17 @@ import { ILogger } from '../interfaces/ILogger';
 export class RailwayClient implements IBackendClient {
   private client: AxiosInstance;
   private logger: ILogger;
-  private relaySecret: string;
+  private edgeSecret: string;
   private userPhone: string;
 
   constructor(
     private backendUrl: string,
     userPhone: string,
-    relaySecret: string,
+    edgeSecret: string,
     logger: ILogger
   ) {
     this.userPhone = userPhone;
-    this.relaySecret = relaySecret;
+    this.edgeSecret = edgeSecret;
     this.logger = logger;
 
     // Create axios instance with connection pooling and Bearer auth
@@ -36,7 +36,7 @@ export class RailwayClient implements IBackendClient {
       timeout: 60000, // 60 seconds (LLM processing can be slow)
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.relaySecret}`
+        'Authorization': `Bearer ${this.edgeSecret}`
       },
       // HTTP connection pooling for better performance
       httpAgent: new http.Agent({
@@ -58,7 +58,7 @@ export class RailwayClient implements IBackendClient {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          this.logger.error('❌ Authentication failed - check RELAY_WEBHOOK_SECRET');
+          this.logger.error('❌ Authentication failed - check EDGE_SECRET');
         } else if (error.response?.status === 429) {
           const retryAfter = error.response.headers['retry-after'] || 60;
           this.logger.warn(`⚠️ Rate limited - retry after ${retryAfter}s`);
