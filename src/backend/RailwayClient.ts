@@ -114,6 +114,9 @@ export class RailwayClient implements IBackendClient {
         const headers: any = {};
         if (this.edgeAgentId) {
           headers['X-Edge-Agent-Id'] = this.edgeAgentId;
+          this.logger.debug(`[${requestId}] Including header: X-Edge-Agent-Id: ${this.edgeAgentId}`);
+        } else {
+          this.logger.warn(`[${requestId}] ⚠️ No edge agent ID set - backend won't be able to correlate WebSocket!`);
         }
 
         const response = await this.client.post('/edge/message', request, { headers });
