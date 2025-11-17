@@ -19,6 +19,7 @@ export class RailwayClient implements IBackendClient {
   private logger: ILogger;
   private edgeSecret: string;
   private userPhone: string;
+  private edgeAgentId: string | null = null;
 
   constructor(
     private backendUrl: string,
@@ -84,7 +85,8 @@ export class RailwayClient implements IBackendClient {
     this.logger.info('📝 Registration not required in new backend architecture');
     // Generate a simple agent ID from phone number
     const phoneDigits = this.userPhone.replace(/[^0-9]/g, '');
-    return `edge_${phoneDigits}`;
+    this.edgeAgentId = `edge_${phoneDigits}`;
+    return this.edgeAgentId;
   }
 
   /**
@@ -108,7 +110,13 @@ export class RailwayClient implements IBackendClient {
       this.logger.info(`[${requestId}] 🔄 POST /edge/message attempt ${attempt} started at ${startTimestamp}`);
 
       try {
-        const response = await this.client.post('/edge/message', request);
+        // Include edge agent ID header so backend knows which WebSocket to use for reflex delivery
+        const headers: any = {};
+        if (this.edgeAgentId) {
+          headers['X-Edge-Agent-Id'] = this.edgeAgentId;
+        }
+
+        const response = await this.client.post('/edge/message', request, { headers });
         const duration = Date.now() - startTime;
         const endTimestamp = new Date().toISOString();
 
@@ -225,8 +233,6 @@ export class RailwayClient implements IBackendClient {
    * Get current edge agent ID
    */
   getEdgeAgentId(): string | null {
-    // Generate from phone number
-    const phoneDigits = this.userPhone.replace(/[^0-9]/g, '');
-    return `edge_${phoneDigits}`;
+    return this.edgeAgentId;
   }
 }
