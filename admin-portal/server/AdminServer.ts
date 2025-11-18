@@ -87,9 +87,14 @@ export class AdminServer {
 
     this.app.use(express.json());
 
-    // Auth middleware
+    // Auth middleware - only protect API endpoints
     this.app.use((req: Request, res: Response, next) => {
-      // Skip auth for public endpoints
+      // Skip auth for non-API requests (static files, HTML)
+      if (!req.path.startsWith('/api/')) {
+        return next();
+      }
+
+      // Skip auth for public API endpoints
       if (req.path === '/api/health' || req.path === '/api/auth/token') {
         return next();
       }
@@ -286,10 +291,11 @@ export class AdminServer {
     });
 
     // Serve static frontend in production
-    const frontendPath = path.join(__dirname, '../client/build');
+    const frontendPath = path.join(process.cwd(), 'admin-portal/client/build');
     if (fs.existsSync(frontendPath)) {
       this.app.use(express.static(frontendPath));
-      this.app.get('*', (req: Request, res: Response) => {
+      // Fallback to index.html for SPA routing (must be last)
+      this.app.use((req: Request, res: Response) => {
         res.sendFile(path.join(frontendPath, 'index.html'));
       });
     }
