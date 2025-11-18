@@ -5,6 +5,8 @@
  */
 
 import { loadConfig, validateConfig } from './config';
+import { Config } from './types/config.types';
+import { IncomingMessage } from './types/message.types';
 import { Logger } from './utils/logger';
 import { AppleScriptTransport } from './transports/AppleScriptTransport';
 import { RailwayClient } from './backend/RailwayClient';
@@ -13,15 +15,21 @@ import { Scheduler } from './scheduler/Scheduler';
 import { CommandHandler } from './commands/CommandHandler';
 import { RuleEngine } from './rules/RuleEngine';
 import { PlanManager } from './plans/PlanManager';
+import { SentryMonitoring } from './monitoring/sentry';
+import { AmplitudeAnalytics } from './monitoring/amplitude';
+import { HealthCheckServer } from './monitoring/health';
 import { v4 as uuidv4 } from 'uuid';
-import { EdgeEventWrapper } from './interfaces/ICommands';
+import { EdgeEventWrapper, EdgeCommandWrapper } from './interfaces/ICommands';
 
 /**
  * Main application class
  */
 class EdgeAgent {
-  private config: any;
+  private config: Config;
   private logger: Logger;
+  private sentry: SentryMonitoring;
+  private amplitude: AmplitudeAnalytics;
+  private healthCheck: HealthCheckServer;
   private transport: AppleScriptTransport;
   private backend: RailwayClient;
   private wsClient: WebSocketClient;
@@ -36,7 +44,16 @@ class EdgeAgent {
   private pendingEvents: EdgeEventWrapper[] = [];
   private lastCommandId: string | null = null;
   private useWebSocket: boolean = true; // Enable WebSocket by default
-  private wsReflexSent: Map<string, { text: string; timestamp: number }> = new Map(); // Track WebSocket-sent reflex messages
+  private wsMessagesSent: Map<string, Set<string>> = new Map(); // Track all WebSocket-sent messages by thread_id
+
+  // MEMORY LEAK FIX: Track all timers for cleanup
+  private activeTimers: Set<NodeJS.Timeout> = new Set();
+  private activeIntervals: Set<NodeJS.Timeout> = new Set();
+
+  // MEMORY LEAK FIX: Track timestamps for WebSocket message tracking
+  private wsMessagesTimestamps: Map<string, Map<string, number>> = new Map();
+  private readonly WS_MESSAGE_TRACKING_MAX_SIZE = 1000;
+  private readonly WS_MESSAGE_TRACKING_MAX_AGE_MS = 60000; // 1 minute
 
   constructor() {
     // Load configuration
@@ -48,6 +65,11 @@ class EdgeAgent {
       this.config.logging.level,
       this.config.logging.file
     );
+
+    // Initialize monitoring
+    this.sentry = new SentryMonitoring(this.config, this.logger);
+    this.amplitude = new AmplitudeAnalytics(this.config, this.logger);
+    this.healthCheck = new HealthCheckServer(this.config, this.logger);
 
     // Initialize transport
     this.transport = new AppleScriptTransport(
@@ -96,6 +118,7 @@ class EdgeAgent {
 
     this.wsClient.onConnected(() => {
       this.logger.info('🔌 WebSocket connected - real-time command delivery enabled');
+      this.healthCheck.setWebSocketConnected(true);
       // Reduce or stop HTTP polling when WebSocket is connected
       if (this.syncInterval) {
         clearInterval(this.syncInterval);
@@ -106,6 +129,7 @@ class EdgeAgent {
 
     this.wsClient.onDisconnected(() => {
       this.logger.warn('🔌 WebSocket disconnected - falling back to HTTP polling');
+      this.healthCheck.setWebSocketConnected(false);
       // Resume HTTP polling as fallback
       if (!this.syncInterval && this.isRunning) {
         this.startSyncLoop();
@@ -116,6 +140,94 @@ class EdgeAgent {
   }
 
   /**
+   * MEMORY LEAK FIX: Safe setTimeout that tracks timer for cleanup
+   */
+  private safeSetTimeout(callback: () => void, ms: number): NodeJS.Timeout {
+    const timer = setTimeout(() => {
+      this.activeTimers.delete(timer);
+      callback();
+    }, ms);
+
+    this.activeTimers.add(timer);
+    return timer;
+  }
+
+  /**
+   * MEMORY LEAK FIX: Safe setInterval that tracks timer for cleanup
+   */
+  private safeSetInterval(callback: () => void, ms: number): NodeJS.Timeout {
+    const timer = setInterval(callback, ms);
+    this.activeIntervals.add(timer);
+    return timer;
+  }
+
+  /**
+   * MEMORY LEAK FIX: Clean up old WebSocket message tracking entries
+   */
+  private cleanupOldTrackedMessages(): void {
+    const now = Date.now();
+
+    // Age-based cleanup
+    for (const [threadId, messages] of this.wsMessagesTimestamps.entries()) {
+      for (const [messageText, timestamp] of messages.entries()) {
+        if (now - timestamp > this.WS_MESSAGE_TRACKING_MAX_AGE_MS) {
+          // Remove from both maps
+          this.wsMessagesSent.get(threadId)?.delete(messageText);
+          messages.delete(messageText);
+        }
+      }
+
+      // Clean up empty thread entries
+      if (messages.size === 0) {
+        this.wsMessagesTimestamps.delete(threadId);
+        this.wsMessagesSent.delete(threadId);
+      }
+    }
+
+    // Size-based eviction (if still too large after age cleanup)
+    const totalTracked = Array.from(this.wsMessagesSent.values())
+      .reduce((sum, set) => sum + set.size, 0);
+
+    if (totalTracked > this.WS_MESSAGE_TRACKING_MAX_SIZE) {
+      this.logger.warn(
+        `⚠️  WebSocket message tracking exceeded max size (${totalTracked}/${this.WS_MESSAGE_TRACKING_MAX_SIZE}), clearing oldest entries`
+      );
+
+      // Clear oldest 20% of entries
+      const entriesToRemove = Math.ceil(totalTracked * 0.2);
+      let removed = 0;
+
+      for (const [threadId, messages] of this.wsMessagesTimestamps.entries()) {
+        if (removed >= entriesToRemove) break;
+
+        // Sort by timestamp (oldest first)
+        const sorted = Array.from(messages.entries())
+          .sort((a, b) => a[1] - b[1]);
+
+        for (const [messageText] of sorted) {
+          if (removed >= entriesToRemove) break;
+
+          this.wsMessagesSent.get(threadId)?.delete(messageText);
+          messages.delete(messageText);
+          removed++;
+        }
+      }
+
+      this.logger.info(`Cleared ${removed} old message tracking entries`);
+    }
+  }
+
+  /**
+   * MEMORY LEAK FIX: Start cleanup interval for tracked messages
+   */
+  private startMemoryCleanup(): void {
+    // Clean up every 30 seconds
+    this.safeSetInterval(() => {
+      this.cleanupOldTrackedMessages();
+    }, 30000);
+  }
+
+  /**
    * Start the edge agent
    */
   async start(): Promise<void> {
@@ -123,6 +235,11 @@ class EdgeAgent {
       this.logger.info('='.repeat(60));
       this.logger.info('Starting Edge Agent v2.0.0 (Phase 2: Transport + Scheduler)');
       this.logger.info('='.repeat(60));
+
+      // Initialize monitoring
+      this.sentry.initialize();
+      this.amplitude.initialize();
+      this.healthCheck.start();
 
       // Register with backend
       this.logger.info('Registering with backend...');
@@ -155,6 +272,10 @@ class EdgeAgent {
 
       // Start message polling loop
       this.isRunning = true;
+
+      // MEMORY LEAK FIX: Start memory cleanup
+      this.startMemoryCleanup();
+
       this.startPolling();
 
       // Try to connect WebSocket for real-time commands
@@ -175,6 +296,7 @@ class EdgeAgent {
 
       this.logger.info('='.repeat(60));
       this.logger.info('✅ Edge Agent is running!');
+      this.healthCheck.setRunning(true);
       this.logger.info(`Polling for messages every ${this.config.imessage.poll_interval_seconds}s`);
 
       if (this.wsClient.isConnected()) {
@@ -200,8 +322,8 @@ class EdgeAgent {
     // Poll immediately
     this.pollMessages();
 
-    // Then poll on interval
-    this.pollInterval = setInterval(() => {
+    // Then poll on interval (using safe interval tracking)
+    this.pollInterval = this.safeSetInterval(() => {
       this.pollMessages();
     }, pollIntervalMs);
   }
@@ -235,7 +357,7 @@ class EdgeAgent {
   /**
    * Process a single message
    */
-  private async processMessage(message: any): Promise<void> {
+  private async processMessage(message: IncomingMessage): Promise<void> {
     try {
       this.logger.info('='.repeat(60));
       this.logger.info(`📨 INCOMING MESSAGE from ${message.sender}`);
@@ -261,64 +383,90 @@ class EdgeAgent {
 
       // Send response if backend wants us to
       if (response.should_respond) {
+        // Get already-sent messages for this thread
+        const wsSentMessages = this.wsMessagesSent.get(message.threadId);
+
         // NEW: Check for reflex/burst split (fast path)
         if (response.reflex_message) {
-          this.logger.info('-'.repeat(60));
-          this.logger.info(`⚡ SENDING REFLEX MESSAGE to ${message.threadId}`);
-          this.logger.info(`   Text: "${response.reflex_message}"`);
-          this.logger.info('-'.repeat(60));
-
-          const reflexSent = await this.transport.sendMessage(
-            message.threadId,
-            response.reflex_message,
-            message.isGroup
-          );
-
-          if (reflexSent) {
-            this.logger.info('✅ Reflex message DELIVERED to iMessage');
+          // Check if reflex message was already sent via WebSocket
+          if (wsSentMessages && wsSentMessages.has(response.reflex_message)) {
+            this.logger.info(`⏭️  Skipping reflex message (already sent via WebSocket)`);
           } else {
-            this.logger.error('❌ FAILED to deliver reflex message to iMessage');
+            this.logger.info('-'.repeat(60));
+            this.logger.info(`⚡ SENDING REFLEX MESSAGE to ${message.threadId}`);
+            this.logger.info(`   Text: "${response.reflex_message}"`);
+            this.logger.info('-'.repeat(60));
+
+            const reflexSent = await this.transport.sendMessage(
+              message.threadId,
+              response.reflex_message,
+              message.isGroup
+            );
+
+            if (reflexSent) {
+              this.logger.info('✅ Reflex message DELIVERED to iMessage');
+            } else {
+              this.logger.error('❌ FAILED to deliver reflex message to iMessage');
+            }
           }
 
           // Send burst messages after delay (if any)
           if (response.burst_messages && response.burst_messages.length > 0) {
-            const delayMs = response.burst_delay_ms || 2000;
-            this.logger.info(`⏳ Will send ${response.burst_messages.length} burst messages after ${delayMs}ms`);
-            this.logger.info(`   Burst messages: ${JSON.stringify(response.burst_messages)}`);
+            // Filter out any burst messages already sent via WebSocket
+            let burstToSend = response.burst_messages;
+            if (wsSentMessages && wsSentMessages.size > 0) {
+              const originalCount = burstToSend.length;
+              burstToSend = burstToSend.filter(msg => !wsSentMessages.has(msg));
+              const skippedCount = originalCount - burstToSend.length;
 
-            setTimeout(async () => {
-              this.logger.info('-'.repeat(60));
-              this.logger.info(`📤 SENDING BURST MESSAGES to ${message.threadId}`);
-              for (let i = 0; i < response.burst_messages!.length; i++) {
-                this.logger.info(`   [${i + 1}/${response.burst_messages!.length}]: "${response.burst_messages![i]}"`);
+              if (skippedCount > 0) {
+                this.logger.info(`⏭️  Skipping ${skippedCount} burst message${skippedCount > 1 ? 's' : ''} (already sent via WebSocket)`);
               }
-              this.logger.info('-'.repeat(60));
+            }
 
-              const burstSent = await this.transport.sendMultiBubble(
-                message.threadId,
-                response.burst_messages!,
-                message.isGroup
-              );
+            if (burstToSend.length === 0) {
+              this.logger.info('ℹ️  All burst messages already sent via WebSocket');
+            } else {
+              const delayMs = response.burst_delay_ms || 2000;
+              this.logger.info(`⏳ Will send ${burstToSend.length} burst messages after ${delayMs}ms`);
+              this.logger.info(`   Burst messages: ${JSON.stringify(burstToSend)}`);
 
-              if (burstSent) {
-                this.logger.info('✅ All burst messages DELIVERED to iMessage');
-              } else {
-                this.logger.error('❌ FAILED to deliver burst messages to iMessage');
-              }
-            }, delayMs);
+              setTimeout(async () => {
+                this.logger.info('-'.repeat(60));
+                this.logger.info(`📤 SENDING BURST MESSAGES to ${message.threadId}`);
+                for (let i = 0; i < burstToSend.length; i++) {
+                  this.logger.info(`   [${i + 1}/${burstToSend.length}]: "${burstToSend[i]}"`);
+                }
+                this.logger.info('-'.repeat(60));
+
+                const burstSent = await this.transport.sendMultiBubble(
+                  message.threadId,
+                  burstToSend,
+                  message.isGroup
+                );
+
+                if (burstSent) {
+                  this.logger.info('✅ All burst messages DELIVERED to iMessage');
+                } else {
+                  this.logger.error('❌ FAILED to deliver burst messages to iMessage');
+                }
+              }, delayMs);
+            }
           }
         }
         // Legacy multi-bubble response
         else if (response.reply_bubbles && response.reply_bubbles.length > 0) {
-          // Check if first bubble was already sent via WebSocket as reflex
-          const wsReflex = this.wsReflexSent.get(message.threadId);
+          // Filter out any bubbles already sent via WebSocket
           let bubblesToSend = response.reply_bubbles;
 
-          if (wsReflex && response.reply_bubbles[0] === wsReflex.text) {
-            // Skip first bubble - already sent via WebSocket
-            bubblesToSend = response.reply_bubbles.slice(1);
-            this.logger.info('⏭️  Skipping first bubble (already sent via WebSocket reflex)');
-            this.wsReflexSent.delete(message.threadId); // Clean up tracking
+          if (wsSentMessages && wsSentMessages.size > 0) {
+            const originalCount = bubblesToSend.length;
+            bubblesToSend = bubblesToSend.filter(bubble => !wsSentMessages.has(bubble));
+            const skippedCount = originalCount - bubblesToSend.length;
+
+            if (skippedCount > 0) {
+              this.logger.info(`⏭️  Skipping ${skippedCount} bubble${skippedCount > 1 ? 's' : ''} (already sent via WebSocket)`);
+            }
           }
 
           if (bubblesToSend.length === 0) {
@@ -346,22 +494,32 @@ class EdgeAgent {
         }
         // Legacy single bubble
         else if (response.reply_text) {
-          this.logger.info('-'.repeat(60));
-          this.logger.info(`📤 SENDING RESPONSE to ${message.threadId}`);
-          this.logger.info(`   Text: "${response.reply_text}"`);
-          this.logger.info('-'.repeat(60));
-
-          const sent = await this.transport.sendMessage(
-            message.threadId,
-            response.reply_text,
-            message.isGroup
-          );
-
-          if (sent) {
-            this.logger.info('✅ Response DELIVERED to iMessage');
+          // Check if message was already sent via WebSocket
+          if (wsSentMessages && wsSentMessages.has(response.reply_text)) {
+            this.logger.info(`⏭️  Skipping message (already sent via WebSocket)`);
           } else {
-            this.logger.error('❌ FAILED to deliver response to iMessage');
+            this.logger.info('-'.repeat(60));
+            this.logger.info(`📤 SENDING RESPONSE to ${message.threadId}`);
+            this.logger.info(`   Text: "${response.reply_text}"`);
+            this.logger.info('-'.repeat(60));
+
+            const sent = await this.transport.sendMessage(
+              message.threadId,
+              response.reply_text,
+              message.isGroup
+            );
+
+            if (sent) {
+              this.logger.info('✅ Response DELIVERED to iMessage');
+            } else {
+              this.logger.error('❌ FAILED to deliver response to iMessage');
+            }
           }
+        }
+
+        // Clean up tracking for this thread after processing HTTP response
+        if (wsSentMessages) {
+          this.wsMessagesSent.delete(message.threadId);
         }
       } else {
         this.logger.info('ℹ️  Backend did not request a response');
@@ -380,8 +538,8 @@ class EdgeAgent {
     // Sync immediately
     this.syncWithBackend();
 
-    // Then sync on interval
-    this.syncInterval = setInterval(() => {
+    // Then sync on interval (using safe interval tracking)
+    this.syncInterval = this.safeSetInterval(() => {
       this.syncWithBackend();
     }, syncIntervalMs);
   }
@@ -445,32 +603,46 @@ class EdgeAgent {
   /**
    * Process a command from the backend
    */
-  private async processCommand(command: any): Promise<void> {
+  private async processCommand(command: EdgeCommandWrapper): Promise<void> {
     try {
       // Log command priority if specified
       if (command.priority === 'immediate') {
         this.logger.info(`⚡ Processing IMMEDIATE priority command ${command.command_id}`);
       }
 
+      // Track message BEFORE execution to prevent race conditions with HTTP response
+      let threadId: string | null = null;
+      let messageText: string | null = null;
+
+      // Extract thread_id and message text from different command types
+      if (command.command_type === 'send_message_now') {
+        threadId = command.payload.thread_id;
+        messageText = command.payload.text;
+      } else if (command.command_type === 'schedule_message') {
+        threadId = command.payload.thread_id;
+        messageText = command.payload.message_text;
+      }
+
+      // Track the message for deduplication IMMEDIATELY (before execution)
+      // MEMORY LEAK FIX: Now uses timestamp-based tracking instead of individual timers
+      if (threadId && messageText) {
+        // Initialize tracking structures
+        if (!this.wsMessagesSent.has(threadId)) {
+          this.wsMessagesSent.set(threadId, new Set());
+          this.wsMessagesTimestamps.set(threadId, new Map());
+        }
+
+        // Track message with timestamp
+        this.wsMessagesSent.get(threadId)!.add(messageText);
+        this.wsMessagesTimestamps.get(threadId)!.set(messageText, Date.now());
+
+        this.logger.info(`📝 Pre-tracking WebSocket message for ${threadId}: "${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}"`);
+
+        // Cleanup happens in periodic cleanupOldTrackedMessages() instead of individual timeouts
+      }
+
       // Execute command
       const result = await this.commandHandler.executeCommand(command);
-
-      // Track WebSocket-sent reflex messages (for skipping duplicates in HTTP response)
-      if (result.success && command.command_type === 'send_message_now') {
-        const payload = command.payload;
-        if (payload.bubble_type === 'reflex') {
-          this.wsReflexSent.set(payload.thread_id, {
-            text: payload.text,
-            timestamp: Date.now()
-          });
-          this.logger.info(`📝 Tracked WebSocket reflex for ${payload.thread_id}: "${payload.text}"`);
-
-          // Auto-cleanup after 10 seconds to prevent memory leak
-          setTimeout(() => {
-            this.wsReflexSent.delete(payload.thread_id);
-          }, 10000);
-        }
-      }
 
       // Update last command ID
       this.lastCommandId = command.command_id;
@@ -519,7 +691,7 @@ class EdgeAgent {
   /**
    * Apply config updates from backend
    */
-  private applyConfigUpdates(updates: any): void {
+  private applyConfigUpdates(updates: { sync_interval?: number; [key: string]: any }): void {
     if (updates.sync_interval) {
       this.logger.info(`Updating sync interval to ${updates.sync_interval}s`);
       this.config.backend.sync_interval_seconds = updates.sync_interval;
@@ -535,7 +707,7 @@ class EdgeAgent {
   /**
    * Add an event to send to backend
    */
-  private addEvent(eventType: string, threadId: string | undefined, details: any): void {
+  private addEvent(eventType: string, threadId: string | undefined, details: Record<string, any>): void {
     const event: EdgeEventWrapper = {
       event_id: uuidv4(),
       event_type: eventType,
@@ -549,20 +721,34 @@ class EdgeAgent {
   /**
    * Stop the edge agent
    */
-  stop(): void {
+  async stop(): Promise<void> {
     this.logger.info('Stopping Edge Agent...');
 
     this.isRunning = false;
 
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval);
-      this.pollInterval = null;
-    }
+    // Flush monitoring events before shutdown
+    await this.sentry.flush();
+    await this.amplitude.flush();
 
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = null;
-    }
+    // MEMORY LEAK FIX: Clear all tracked intervals
+    this.activeIntervals.forEach(interval => {
+      clearInterval(interval);
+    });
+    this.activeIntervals.clear();
+
+    // MEMORY LEAK FIX: Clear all tracked timeouts
+    this.activeTimers.forEach(timer => {
+      clearTimeout(timer);
+    });
+    this.activeTimers.clear();
+
+    // Clear legacy interval references (already tracked in activeIntervals)
+    this.pollInterval = null;
+    this.syncInterval = null;
+
+    // MEMORY LEAK FIX: Clear WebSocket message tracking
+    this.wsMessagesSent.clear();
+    this.wsMessagesTimestamps.clear();
 
     // Disconnect WebSocket
     this.wsClient.disconnect();
@@ -570,7 +756,12 @@ class EdgeAgent {
     this.scheduler.stop();
     this.transport.stop();
 
-    this.logger.info('✅ Edge Agent stopped');
+    // Close monitoring
+    this.healthCheck.stop();
+    await this.sentry.close();
+    await this.amplitude.shutdown();
+
+    this.logger.info('✅ Edge Agent stopped (cleaned up all timers and tracking)');
   }
 }
 
@@ -581,28 +772,28 @@ async function main() {
   const agent = new EdgeAgent();
 
   // Handle shutdown gracefully
-  process.on('SIGINT', () => {
+  process.on('SIGINT', async () => {
     console.log('\n\nReceived SIGINT, shutting down gracefully...');
-    agent.stop();
+    await agent.stop();
     process.exit(0);
   });
 
-  process.on('SIGTERM', () => {
+  process.on('SIGTERM', async () => {
     console.log('\n\nReceived SIGTERM, shutting down gracefully...');
-    agent.stop();
+    await agent.stop();
     process.exit(0);
   });
 
   // Handle uncaught errors
-  process.on('uncaughtException', (error) => {
+  process.on('uncaughtException', async (error) => {
     console.error('Uncaught exception:', error);
-    agent.stop();
+    await agent.stop();
     process.exit(1);
   });
 
-  process.on('unhandledRejection', (error) => {
+  process.on('unhandledRejection', async (error) => {
     console.error('Unhandled rejection:', error);
-    agent.stop();
+    await agent.stop();
     process.exit(1);
   });
 

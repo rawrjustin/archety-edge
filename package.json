@@ -28,6 +28,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@amplitude/node": "^1.10.2",
+    "@sentry/node": "^10.25.0",
+    "@sentry/profiling-node": "^10.25.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.9",
@@ -36,12 +39,15 @@
     "axios": "^1.7.2",
     "better-sqlite3": "^11.1.2",
     "dotenv": "^16.4.5",
+    "express": "^5.1.0",
     "js-yaml": "^4.1.0",
     "typescript": "^5.5.3",
     "uuid": "^10.0.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/express": "^5.0.5",
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
     "nodemon": "^3.1.4",
