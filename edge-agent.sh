@@ -49,14 +49,16 @@ is_running() {
 status() {
     if is_running; then
         PID=$(cat "$PID_FILE")
-        log_info "Edge agent is running (PID: $PID)"
+        log_info "Edge agent + admin portal is running (PID: $PID)"
+        log_info "📊 Admin Portal: http://127.0.0.1:3100"
+        log_info "🔍 Health Check: http://127.0.0.1:3001/health"
 
         # Show resource usage
         ps -p "$PID" -o pid,pcpu,pmem,etime,command 2>/dev/null || true
 
         return 0
     else
-        log_warn "Edge agent is not running"
+        log_warn "Edge agent and admin portal are not running"
         return 1
     fi
 }
@@ -68,17 +70,17 @@ start() {
     # Check if already running
     if is_running; then
         PID=$(cat "$PID_FILE")
-        log_error "Edge agent is already running (PID: $PID)"
-        log_info "Use '$0 restart' to restart it"
+        log_error "Edge agent and admin portal are already running (PID: $PID)"
+        log_info "Use '$0 restart' to restart them"
         exit 1
     fi
 
-    # Kill any orphaned node processes running edge agent
+    # Kill any orphaned node processes running edge agent or admin portal
     log_info "Checking for orphaned processes..."
-    ORPHANS=$(pgrep -f "node dist/index.js" || true)
+    ORPHANS=$(pgrep -f "node dist/(index|admin-portal)" || true)
     if [ -n "$ORPHANS" ]; then
         log_warn "Found orphaned processes, cleaning up..."
-        killall -9 node 2>/dev/null || true
+        pkill -f "node dist/(index|admin-portal)" 2>/dev/null || true
         sleep 1
     fi
 
@@ -87,11 +89,11 @@ start() {
         export $(cat "$SCRIPT_DIR/.env" | grep -v "^#" | xargs)
     fi
 
-    # Start the agent
-    log_info "Starting edge agent..."
+    # Start the agent with admin portal
+    log_info "Starting edge agent with admin portal..."
 
     # Run in background and capture PID
-    nohup npm start > "$LOG_FILE" 2>&1 &
+    nohup npm run admin > "$LOG_FILE" 2>&1 &
     PID=$!
 
     # Wait a moment to ensure it started
@@ -100,10 +102,12 @@ start() {
     # Verify it's actually running
     if ps -p "$PID" > /dev/null 2>&1; then
         echo "$PID" > "$PID_FILE"
-        log_info "✅ Edge agent started successfully (PID: $PID)"
+        log_info "✅ Edge agent and admin portal started successfully (PID: $PID)"
+        log_info "📊 Admin Portal: http://127.0.0.1:3100"
+        log_info "🔍 Health Check: http://127.0.0.1:3001/health"
         log_info "View logs: tail -f $LOG_FILE"
     else
-        log_error "Failed to start edge agent"
+        log_error "Failed to start edge agent and admin portal"
         log_error "Check logs: cat $LOG_FILE"
         exit 1
     fi
@@ -115,10 +119,10 @@ stop() {
         log_warn "Edge agent is not running"
 
         # Clean up any orphaned processes anyway
-        ORPHANS=$(pgrep -f "node dist/index.js" || true)
+        ORPHANS=$(pgrep -f "node dist/(index|admin-portal)" || true)
         if [ -n "$ORPHANS" ]; then
             log_warn "Found orphaned processes, cleaning up..."
-            killall -9 node 2>/dev/null || true
+            pkill -9 -f "node dist/(index|admin-portal)" 2>/dev/null || true
         fi
 
         return 0
@@ -148,15 +152,15 @@ stop() {
     # Clean up PID file
     rm -f "$PID_FILE"
 
-    # Double check - kill any remaining node processes
-    killall -9 node 2>/dev/null || true
+    # Double check - kill any remaining edge agent and admin portal processes
+    pkill -9 -f "node dist/(index|admin-portal)" 2>/dev/null || true
 
-    log_info "✅ Edge agent stopped"
+    log_info "✅ Edge agent and admin portal stopped"
 }
 
 # Restart the edge agent
 restart() {
-    log_info "Restarting edge agent..."
+    log_info "Restarting edge agent and admin portal..."
     stop
     sleep 2
     start
@@ -194,17 +198,21 @@ case "${1:-}" in
         logs "$2"
         ;;
     *)
-        echo "Edge Agent Process Manager"
+        echo "Edge Agent + Admin Portal Process Manager"
         echo ""
         echo "Usage: $0 {start|stop|restart|status|logs}"
         echo ""
         echo "Commands:"
-        echo "  start     Start the edge agent (ensures only one instance)"
-        echo "  stop      Stop the edge agent"
-        echo "  restart   Restart the edge agent"
-        echo "  status    Check if edge agent is running"
+        echo "  start     Start edge agent with admin portal"
+        echo "  stop      Stop edge agent and admin portal"
+        echo "  restart   Restart both services"
+        echo "  status    Check if services are running"
         echo "  logs      Show last 50 lines of logs"
         echo "  logs -f   Follow logs in real-time"
+        echo ""
+        echo "Access Points:"
+        echo "  Admin Portal:  http://127.0.0.1:3100"
+        echo "  Health Check:  http://127.0.0.1:3001/health"
         echo ""
         exit 1
         ;;
