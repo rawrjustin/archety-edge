@@ -4,6 +4,7 @@ edge:
 
 backend:
   url: "https://archety-backend-dev.up.railway.app"
+  websocket_url: "wss://archety-backend-dev.up.railway.app"  # WebSocket URL (derived from url if not set)
   sync_interval_seconds: 30  # Fallback polling interval if WebSocket disconnects
 
 websocket:
@@ -25,3 +26,18 @@ scheduler:
 logging:
   level: "info"  # debug, info, warn, error
   file: "./edge-agent.log"
+
+monitoring:
+  sentry:
+    enabled: false  # Set to true and add DSN to enable error tracking
+    # dsn: "https://your-sentry-dsn@sentry.io/project-id"
+    environment: "development"
+    traces_sample_rate: 0.1  # 10% of transactions for performance monitoring
+    profiles_sample_rate: 0.1  # 10% profiling
+  amplitude:
+    enabled: false  # Set to true and add API key to enable analytics
+    # api_key: "your-amplitude-api-key"
+    flush_interval_ms: 10000  # Flush events every 10 seconds
+  health_check:
+    enabled: true  # Enable health check endpoint
+    port: 3001  # Health check HTTP server port

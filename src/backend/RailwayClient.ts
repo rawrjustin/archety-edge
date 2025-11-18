@@ -9,7 +9,7 @@ import { ILogger } from '../interfaces/ILogger';
  * RailwayClient - Backend client for communicating with Sage backend on Railway
  *
  * Updated November 2025 for new backend architecture:
- * - Bearer token authentication (RELAY_WEBHOOK_SECRET)
+ * - Bearer token authentication (EDGE_SECRET - same for HTTP and WebSocket)
  * - /edge/message endpoint (WebSocket-aware)
  * - No registration needed
  * - Rate limiting support (429 handling)
@@ -17,17 +17,18 @@ import { ILogger } from '../interfaces/ILogger';
 export class RailwayClient implements IBackendClient {
   private client: AxiosInstance;
   private logger: ILogger;
-  private relaySecret: string;
+  private edgeSecret: string;
   private userPhone: string;
+  private edgeAgentId: string | null = null;
 
   constructor(
     private backendUrl: string,
     userPhone: string,
-    relaySecret: string,
+    edgeSecret: string,
     logger: ILogger
   ) {
     this.userPhone = userPhone;
-    this.relaySecret = relaySecret;
+    this.edgeSecret = edgeSecret;
     this.logger = logger;
 
     // Create axios instance with connection pooling and Bearer auth
@@ -36,7 +37,7 @@ export class RailwayClient implements IBackendClient {
       timeout: 60000, // 60 seconds (LLM processing can be slow)
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.relaySecret}`
+        'Authorization': `Bearer ${this.edgeSecret}`
       },
       // HTTP connection pooling for better performance
       httpAgent: new http.Agent({
@@ -58,7 +59,7 @@ export class RailwayClient implements IBackendClient {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          this.logger.error('❌ Authentication failed - check RELAY_WEBHOOK_SECRET');
+          this.logger.error('❌ Authentication failed - check EDGE_SECRET');
         } else if (error.response?.status === 429) {
           const retryAfter = error.response.headers['retry-after'] || 60;
           this.logger.warn(`⚠️ Rate limited - retry after ${retryAfter}s`);
@@ -84,7 +85,8 @@ export class RailwayClient implements IBackendClient {
     this.logger.info('📝 Registration not required in new backend architecture');
     // Generate a simple agent ID from phone number
     const phoneDigits = this.userPhone.replace(/[^0-9]/g, '');
-    return `edge_${phoneDigits}`;
+    this.edgeAgentId = `edge_${phoneDigits}`;
+    return this.edgeAgentId;
   }
 
   /**
@@ -108,7 +110,16 @@ export class RailwayClient implements IBackendClient {
       this.logger.info(`[${requestId}] 🔄 POST /edge/message attempt ${attempt} started at ${startTimestamp}`);
 
       try {
-        const response = await this.client.post('/edge/message', request);
+        // Include edge agent ID header so backend knows which WebSocket to use for reflex delivery
+        const headers: any = {};
+        if (this.edgeAgentId) {
+          headers['X-Edge-Agent-Id'] = this.edgeAgentId;
+          this.logger.debug(`[${requestId}] Including header: X-Edge-Agent-Id: ${this.edgeAgentId}`);
+        } else {
+          this.logger.warn(`[${requestId}] ⚠️ No edge agent ID set - backend won't be able to correlate WebSocket!`);
+        }
+
+        const response = await this.client.post('/edge/message', request, { headers });
         const duration = Date.now() - startTime;
         const endTimestamp = new Date().toISOString();
 
@@ -225,8 +236,6 @@ export class RailwayClient implements IBackendClient {
    * Get current edge agent ID
    */
   getEdgeAgentId(): string | null {
-    // Generate from phone number
-    const phoneDigits = this.userPhone.replace(/[^0-9]/g, '');
-    return `edge_${phoneDigits}`;
+    return this.edgeAgentId;
   }
 }

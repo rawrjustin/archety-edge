@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { Config, ConfigSchema, validateConfigSafe } from './types/config.types';
+import { z } from 'zod';
 
 // Load environment variables
 dotenv.config();
@@ -57,55 +59,34 @@ const PERFORMANCE_PROFILES = {
   }
 };
 
-export interface Config {
-  edge: {
-    agent_id: string;
-    user_phone: string;
-  };
-  backend: {
-    url: string;
-    sync_interval_seconds: number;
-    request_timeout_ms?: number;  // Default: 10000
-    max_concurrent_requests?: number;  // Default: 3
-  };
-  websocket?: {
-    enabled?: boolean;  // Default: true (enable WebSocket for real-time commands)
-    reconnect_attempts?: number;  // DEPRECATED: Ignored (WebSocket now retries indefinitely)
-    ping_interval_seconds?: number;  // Default: 30
-  };
-  imessage: {
-    poll_interval_seconds: number;
-    db_path: string;
-    enable_fast_check?: boolean;  // Default: true (pre-check before JOINs)
-    max_messages_per_poll?: number;  // Default: 100
-  };
-  database: {
-    path: string;
-  };
-  scheduler?: {
-    check_interval_seconds?: number;  // Default: 30
-    adaptive_mode?: boolean;  // Default: true (Phase 3: near-instant delivery)
-  };
-  performance?: {
-    profile?: 'balanced' | 'low-latency' | 'low-resource';  // Default: 'balanced'
-    parallel_message_processing?: boolean;  // Default: true
-    batch_applescript_sends?: boolean;  // Default: false (future optimization)
-  };
-  logging: {
-    level: 'debug' | 'info' | 'warn' | 'error';
-    file: string;
-  };
-}
+// Config type is now imported from ./types/config.types.ts
+// This ensures type safety and runtime validation with Zod
 
 /**
  * Load configuration from config.yaml and environment variables
  * Environment variables take precedence over config file
  * ENHANCED: Supports performance profiles and optimized defaults
+ * NOW WITH RUNTIME VALIDATION: Uses Zod to validate config at startup
  */
 export function loadConfig(configPath: string = './config.yaml'): Config {
   // Load YAML config
   const configFile = fs.readFileSync(configPath, 'utf8');
-  const config = yaml.load(configFile) as Config;
+  const rawConfig = yaml.load(configFile);
+
+  // Validate and parse config with Zod
+  let config: Config;
+  try {
+    config = ConfigSchema.parse(rawConfig);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('❌ Configuration validation failed:');
+      error.issues.forEach((err: z.ZodIssue) => {
+        console.error(`   ${err.path.join('.')}: ${err.message}`);
+      });
+      throw new Error('Invalid configuration. Please check config.yaml and fix the errors above.');
+    }
+    throw error;
+  }
 
   // Apply performance profile if specified
   const profile = config.performance?.profile || 'balanced';
@@ -165,25 +146,18 @@ export function loadConfig(configPath: string = './config.yaml'): Config {
 
 /**
  * Validate configuration
+ * NOTE: Most validation is now done by Zod schema in loadConfig()
+ * This function only checks runtime conditions (e.g., file existence)
  */
 export function validateConfig(config: Config): void {
-  if (!config.edge.user_phone) {
-    throw new Error('user_phone is required in config');
-  }
-
-  if (!config.backend.url) {
-    throw new Error('backend URL is required in config');
-  }
-
-  if (!config.imessage.db_path) {
-    throw new Error('imessage db_path is required in config');
-  }
-
-  // Check if Messages DB exists
+  // Check if Messages DB exists (runtime check, not schema validation)
   if (!fs.existsSync(config.imessage.db_path)) {
     throw new Error(
       `Messages database not found at ${config.imessage.db_path}. ` +
       'Make sure iMessage is configured and you have Full Disk Access permissions.'
     );
   }
+
+  // Additional runtime validations can go here
+  // Schema validation (required fields, types, etc.) is handled by Zod
 }

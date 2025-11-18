@@ -171,6 +171,116 @@ Edge agent sends:
 
 Validate both the Bearer token and that the edge_agent_id exists in your database.
 
+## ⚡ HTTP/WebSocket Correlation for Instant Reflex Delivery
+
+**New Feature (November 17, 2025):** Edge client now sends `X-Edge-Agent-Id` header in HTTP requests so you can correlate them with WebSocket connections.
+
+### The Problem
+
+When a user sends a message:
+1. Edge client POSTs to `/edge/message` (HTTP)
+2. Backend generates a reflex response
+3. Backend wants to send reflex instantly via WebSocket
+4. **But which WebSocket?** Need to correlate HTTP request to WebSocket connection
+
+### The Solution
+
+Edge client now sends `X-Edge-Agent-Id` header in HTTP requests:
+
+```http
+POST /edge/message
+Authorization: Bearer {EDGE_SECRET}
+X-Edge-Agent-Id: edge_13238407486  ← Use this to look up WebSocket!
+Content-Type: application/json
+
+{
+  "thread_id": "+15622924139",
+  "sender": "+15622924139",
+  "filtered_text": "Can you find me the best deal for a Mac mini?"
+}
+```
+
+### Implementation Example
+
+```typescript
+// Store WebSocket connections keyed by edge_agent_id
+const websocketConnections = new Map<string, WebSocket>();
+
+// When WebSocket connects
+wss.on('connection', (ws, req) => {
+  const edgeAgentId = new URL(req.url, 'http://localhost').searchParams.get('edge_agent_id');
+  websocketConnections.set(edgeAgentId, ws);  // Store it!
+
+  ws.on('close', () => {
+    websocketConnections.delete(edgeAgentId);  // Clean up
+  });
+});
+
+// When HTTP request arrives
+app.post('/edge/message', async (req, res) => {
+  // Extract edge agent ID from header
+  const edgeAgentId = req.headers['x-edge-agent-id'];
+
+  // Process message and generate reflex
+  const reflexText = await generateReflex(req.body);
+
+  // Look up WebSocket connection
+  const ws = websocketConnections.get(edgeAgentId);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    // Send reflex INSTANTLY via WebSocket
+    ws.send(JSON.stringify({
+      type: 'command',
+      data: {
+        command_id: uuidv4(),
+        command_type: 'send_message_now',  // NEW command type
+        payload: {
+          thread_id: req.body.thread_id,
+          text: reflexText,
+          bubble_type: 'reflex'
+        },
+        priority: 'immediate',
+        timestamp: new Date().toISOString()
+      }
+    }));
+
+    console.log(`📤 Sent reflex via WebSocket to ${edgeAgentId}: ${reflexText}`);
+  } else {
+    console.log(`⚠️ WebSocket not found for ${edgeAgentId}, will return in HTTP response only`);
+  }
+
+  // Also return in HTTP response (fallback + remaining bubbles)
+  res.json({
+    should_respond: true,
+    reply_bubbles: [reflexText, 'bubble 2', 'bubble 3', ...]
+  });
+});
+```
+
+### Edge Client Behavior
+
+1. Receives `send_message_now` command via WebSocket → Sends reflex to iMessage **instantly** (<500ms)
+2. Later receives HTTP response with all bubbles → **Skips first bubble** (already sent)
+3. Result: User sees reflex immediately, then burst messages follow
+
+### Debug Logging
+
+Backend should log:
+```
+[WebSocket] Connected: edge_13238407486 (total: 1)
+[HTTP POST] Received from edge_13238407486
+[Reflex] WebSocket found for edge_13238407486 ✅
+[Reflex] Sent "okie lemme see" via WebSocket to edge_13238407486
+```
+
+If WebSocket not found:
+```
+[HTTP POST] Received from edge_13238407486
+[Reflex] WebSocket NOT found ❌ (will return in HTTP response only)
+```
+
+**See:** `docs/BACKEND_WEBSOCKET_CORRELATION.md` for complete implementation guide with Python examples.
+
 ## Testing the Implementation
 
 ### 1. Check Edge Agent Status
