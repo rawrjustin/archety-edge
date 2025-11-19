@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
-import { IncomingMessage } from '../interfaces/IMessageTransport';
+import * as path from 'path';
+import { IncomingMessage, MessageAttachment } from '../interfaces/IMessageTransport';
 import { ILogger } from '../interfaces/ILogger';
 
 /**
@@ -10,10 +11,12 @@ import { ILogger } from '../interfaces/ILogger';
 export class MessagesDB {
   private db: Database.Database;
   private lastMessageId: number = 0;
+  private attachmentsDir: string;
   private logger: ILogger;
 
-  constructor(dbPath: string, logger: ILogger) {
+  constructor(dbPath: string, attachmentsDir: string, logger: ILogger) {
     this.logger = logger;
+    this.attachmentsDir = attachmentsDir;
 
     // Check if database exists
     if (!fs.existsSync(dbPath)) {
@@ -105,13 +108,16 @@ export class MessagesDB {
         // Get participants if it's a group chat
         const participants = isGroup ? this.getGroupParticipants(row.thread_id) : [];
 
+        const attachments = this.getAttachmentsForMessage(row.id);
+
         messages.push({
           threadId: row.thread_id,
           sender: row.sender || 'unknown',
           text: row.text || '',
           timestamp,
           isGroup,
-          participants
+          participants,
+          attachments
         });
 
         this.logger.debug(`New message from ${row.sender}: "${row.text.substring(0, 50)}..."`);
@@ -126,6 +132,105 @@ export class MessagesDB {
       this.logger.error('Failed to poll messages:', error.message);
       return [];
     }
+  }
+
+  /**
+   * Fetch attachments for a given message
+   */
+  private getAttachmentsForMessage(messageId: number): MessageAttachment[] {
+    try {
+      const query = `
+        SELECT
+          a.ROWID as id,
+          a.guid,
+          a.filename,
+          a.uti,
+          a.mime_type,
+          a.transfer_name,
+          a.total_bytes,
+          a.created_date,
+          a.is_sticker,
+          a.is_outgoing
+        FROM attachment a
+        JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID
+        WHERE maj.message_id = ?
+      `;
+
+      const rows = this.db.prepare(query).all(messageId) as any[];
+
+      this.logger.debug(`Found ${rows.length} attachment(s) for message ${messageId}`);
+
+      return rows.map(row => {
+        // Debug: Log raw attachment data from database
+        this.logger.debug(`Attachment from DB: guid=${row.guid}, filename="${row.filename}", transfer_name="${row.transfer_name}", uti=${row.uti}`);
+        this.logger.debug(`  Raw row data: ${JSON.stringify(row)}`);
+
+        const paths = this.resolveAttachmentPath(row.filename);
+        const appleEpoch = 978307200;
+        const createdAt = row.created_date
+          ? new Date(((row.created_date / 1000000000) + appleEpoch) * 1000)
+          : undefined;
+
+        return {
+          id: row.id,
+          guid: row.guid,
+          filename: row.filename || undefined,
+          uti: row.uti || undefined,
+          mimeType: row.mime_type || undefined,
+          transferName: row.transfer_name || undefined,
+          totalBytes: typeof row.total_bytes === 'number' ? row.total_bytes : undefined,
+          createdAt,
+          relativePath: paths.relativePath || undefined,
+          absolutePath: paths.absolutePath || undefined,
+          isSticker: row.is_sticker === 1,
+          isOutgoing: row.is_outgoing === 1
+        };
+      });
+    } catch (error: any) {
+      this.logger.warn(`Failed to load attachments for message ${messageId}: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Resolve attachment path relative to configured attachments directory
+   */
+  private resolveAttachmentPath(filename?: string): {
+    relativePath?: string;
+    absolutePath?: string;
+  } {
+    if (!filename) {
+      this.logger.debug('resolveAttachmentPath: no filename provided');
+      return {};
+    }
+
+    let candidate = filename;
+
+    if (candidate.startsWith('~')) {
+      candidate = candidate.replace(/^~/, process.env.HOME || '');
+    } else if (!path.isAbsolute(candidate)) {
+      if (candidate.startsWith('Library/')) {
+        candidate = path.join(process.env.HOME || '', candidate);
+      } else {
+        candidate = path.join(this.attachmentsDir, candidate);
+      }
+    }
+
+    const absolutePath = path.resolve(candidate);
+
+    if (!fs.existsSync(absolutePath)) {
+      this.logger.warn(`Attachment file not found: ${absolutePath} (from filename: ${filename})`);
+      return {};
+    }
+
+    let relativePath: string | undefined;
+    try {
+      relativePath = path.relative(this.attachmentsDir, absolutePath);
+    } catch {
+      relativePath = undefined;
+    }
+
+    return { absolutePath, relativePath };
   }
 
   /**

@@ -3,6 +3,21 @@
  * This allows us to swap between AppleScript, Swift, or other implementations
  */
 
+export interface MessageAttachment {
+  id: number;
+  guid: string;
+  filename?: string;
+  uti?: string;
+  mimeType?: string;
+  transferName?: string;
+  totalBytes?: number;
+  createdAt?: Date;
+  relativePath?: string;
+  absolutePath?: string;
+  isSticker?: boolean;
+  isOutgoing?: boolean;
+}
+
 export interface IncomingMessage {
   threadId: string;        // Chat GUID from Messages DB
   sender: string;          // Phone number or Apple ID
@@ -10,6 +25,7 @@ export interface IncomingMessage {
   timestamp: Date;         // When message was sent
   isGroup: boolean;        // 1:1 vs group chat
   participants: string[];  // All participants in the chat
+  attachments?: MessageAttachment[];
 }
 
 export interface IMessageTransport {

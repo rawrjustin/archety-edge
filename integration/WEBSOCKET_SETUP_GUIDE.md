@@ -24,13 +24,13 @@ The WebSocket endpoint requires authentication via the `Authorization` header wi
 
 ### 1. Get the EDGE_SECRET
 
-**Option A: Use the same secret as RELAY_WEBHOOK_SECRET (Simple)**
+**Option A: Reuse the HTTP secret (Simple)**
 
-The backend accepts the `EDGE_SECRET` as a simple Bearer token for WebSocket authentication. For MVP, you can use the same secret you're using for HTTP requests:
+The backend accepts the `EDGE_SECRET` as a simple Bearer token for WebSocket authentication. For MVP, you can use the same secret you're already using for HTTP requests:
 
 ```bash
 # In your .env
-EDGE_SECRET="your-shared-secret-here"  # Same as RELAY_WEBHOOK_SECRET
+EDGE_SECRET="your-shared-secret-here"  # Same secret used for HTTP auth
 ```
 
 **Option B: Generate a separate EDGE_SECRET (Recommended for production)**
@@ -410,11 +410,8 @@ EDGE_AGENT_ID=edge_13238407486
 
 **Backend (Railway environment variables):**
 ```bash
-# WebSocket authentication
+# WebSocket + HTTP authentication
 EDGE_SECRET=your-shared-secret-here  # MUST match edge client
-
-# Optional: Separate from HTTP auth
-RELAY_WEBHOOK_SECRET=different-secret-for-http
 ```
 
 ---

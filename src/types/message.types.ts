@@ -3,13 +3,29 @@ import { z } from 'zod';
 /**
  * Zod schema for incoming messages from iMessage
  */
+const AttachmentMetadataSchema = z.object({
+  id: z.number(),
+  guid: z.string(),
+  filename: z.string().optional(),
+  uti: z.string().optional(),
+  mimeType: z.string().optional(),
+  transferName: z.string().optional(),
+  totalBytes: z.number().optional(),
+  createdAt: z.date().optional(),
+  relativePath: z.string().optional(),
+  absolutePath: z.string().optional(),
+  isSticker: z.boolean().optional(),
+  isOutgoing: z.boolean().optional()
+});
+
 export const IncomingMessageSchema = z.object({
   threadId: z.string().min(1, 'threadId is required'),
   sender: z.string().min(1, 'sender is required'),
   text: z.string(),
   timestamp: z.date(),
   isGroup: z.boolean(),
-  participants: z.array(z.string())
+  participants: z.array(z.string()),
+  attachments: z.array(AttachmentMetadataSchema).optional()
 });
 
 /**
@@ -29,7 +45,22 @@ export const BackendMessageRequestSchema = z.object({
   participants: z.array(z.string()),
   was_redacted: z.boolean(),
   redacted_fields: z.array(z.string()),
-  filter_reason: z.string()
+  filter_reason: z.string(),
+  context: z.object({
+    active_miniapp: z.string().optional(),
+    room_id: z.string().optional(),
+    state: z.enum(['active', 'completed']).optional(),
+    metadata: z.record(z.string(), z.any()).optional()
+  }).optional(),
+  attachments: z.array(z.object({
+    guid: z.string(),
+    mime_type: z.string().optional(),
+    size_bytes: z.number().nullable().optional(),
+    is_photo: z.boolean().optional(),
+    uploaded_photo_id: z.string().optional(),
+    skipped: z.boolean().optional(),
+    skip_reason: z.string().optional()
+  })).optional()
 });
 
 export type BackendMessageRequest = z.infer<typeof BackendMessageRequestSchema>;
@@ -43,7 +74,17 @@ export const BackendMessageResponseSchema = z.object({
   reply_bubbles: z.array(z.string()).optional(),
   reflex_message: z.string().optional(),
   burst_messages: z.array(z.string()).optional(),
-  burst_delay_ms: z.number().optional()
+  burst_delay_ms: z.number().optional(),
+  mini_app_triggered: z.string().nullable().optional(),
+  room_id: z.string().nullable().optional(),
+  commands: z.array(z.any()).optional(),
+  responses: z.array(z.object({
+    text: z.string(),
+    recipient: z.string().nullable().optional(),
+    chat_guid: z.string().optional(),
+    is_reflex: z.boolean().optional()
+  })).optional(),
+  context_metadata: z.record(z.string(), z.any()).optional()
 });
 
 export type BackendMessageResponse = z.infer<typeof BackendMessageResponseSchema>;

@@ -15,6 +15,8 @@ export interface BackendMessageRequest {
   was_redacted?: boolean;
   redacted_fields?: string[];
   filter_reason: string;
+  context?: BackendMiniAppContext;
+  attachments?: BackendAttachmentSummary[];
 }
 
 export interface BackendMessageResponse {
@@ -26,6 +28,51 @@ export interface BackendMessageResponse {
   reflex_message?: string;  // Immediate response (sent first, ~100ms target)
   burst_messages?: string[];  // Follow-up messages (sent after delay)
   burst_delay_ms?: number;  // Delay before burst (default: 2000ms)
+  mini_app_triggered?: string | null;
+  room_id?: string | null;
+  commands?: any[];
+  responses?: Array<{
+    text: string;
+    recipient?: string | null;
+    chat_guid?: string;
+    is_reflex?: boolean;
+  }>;
+  context_metadata?: Record<string, any>;
+}
+
+export interface BackendMiniAppContext {
+  active_miniapp?: string;
+  room_id?: string;
+  state?: 'active' | 'completed';
+  metadata?: Record<string, any>;
+}
+
+export interface BackendAttachmentSummary {
+  guid: string;
+  mime_type?: string;
+  size_bytes?: number | null;
+  is_photo?: boolean;
+  uploaded_photo_id?: string;
+  skipped?: boolean;
+  skip_reason?: string;
+}
+
+export interface PhotoUploadRequest {
+  photo_data: string;
+  user_phone: string;
+  chat_guid: string;
+  mime_type?: string;
+  size_bytes?: number;
+  attachment_guid?: string;
+  context?: BackendMiniAppContext;
+}
+
+export interface PhotoUploadResponse {
+  photo_id: string;
+  photo_url: string;
+  analysis?: Record<string, any>;
+  action?: string | null;
+  event?: Record<string, any>;
 }
 
 export interface IBackendClient {
@@ -38,6 +85,11 @@ export interface IBackendClient {
    * Send a message to the backend for processing
    */
   sendMessage(request: BackendMessageRequest): Promise<BackendMessageResponse>;
+
+  /**
+   * Upload a photo attachment to the backend
+   */
+  uploadPhoto(request: PhotoUploadRequest): Promise<PhotoUploadResponse>;
 
   /**
    * Sync with backend - send events and receive commands

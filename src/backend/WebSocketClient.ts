@@ -17,6 +17,7 @@ export class WebSocketClient {
   private maxReconnectDelay = 60000; // Max 60 seconds
   private isConnecting = false;
   private shouldReconnect = true;
+  private isClosingForReconnect = false; // Flag to prevent reconnect loop during cleanup
   private pingInterval: NodeJS.Timeout | null = null;
   private onCommandCallback: ((command: EdgeCommandWrapper) => Promise<void>) | null = null;
   private onConnectedCallback: (() => void) | null = null;
@@ -75,6 +76,17 @@ export class WebSocketClient {
     if (!this.edgeAgentId) {
       this.logger.error('Cannot connect WebSocket: no edge agent ID set');
       return false;
+    }
+
+    // Clean up any existing WebSocket before creating a new one
+    if (this.ws) {
+      this.isClosingForReconnect = true; // Prevent handleClose from scheduling reconnect
+      this.ws.removeAllListeners();
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.close();
+      }
+      this.ws = null;
+      this.isClosingForReconnect = false;
     }
 
     this.isConnecting = true;
@@ -217,6 +229,12 @@ export class WebSocketClient {
     // Notify callback
     if (this.onDisconnectedCallback) {
       this.onDisconnectedCallback();
+    }
+
+    // Don't reconnect if we're closing for cleanup (about to create new connection)
+    if (this.isClosingForReconnect) {
+      this.logger.debug('Skipping reconnect - closing for cleanup');
+      return;
     }
 
     // Attempt reconnection if enabled (will retry indefinitely)

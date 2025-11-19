@@ -29,12 +29,17 @@ export const ConfigSchema = z.object({
   imessage: z.object({
     poll_interval_seconds: z.number().min(0.1).max(60),
     db_path: z.string().min(1),
+    attachments_path: z.string().optional(),
+    transport_mode: z.enum(['applescript', 'native_helper']).optional(),
+    bridge_executable: z.string().optional(),
+    bridge_args: z.array(z.string()).optional(),
     enable_fast_check: z.boolean().optional(),
     max_messages_per_poll: z.number().min(1).max(1000).optional()
   }),
 
   database: z.object({
     path: z.string().min(1),
+    state_path: z.string().optional(),
     rules_path: z.string().optional(),
     plans_path: z.string().optional()
   }),
@@ -48,6 +53,11 @@ export const ConfigSchema = z.object({
     profile: z.enum(['balanced', 'low-latency', 'low-resource']).optional(),
     parallel_message_processing: z.boolean().optional(),
     batch_applescript_sends: z.boolean().optional()
+  }).optional(),
+
+  security: z.object({
+    keychain_service: z.string().optional(),
+    keychain_account: z.string().optional()
   }).optional(),
 
   logging: z.object({

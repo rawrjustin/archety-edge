@@ -1,5 +1,5 @@
 edge:
-  agent_id: "edge_13238407486"  # Generated from phone number
+  agent_id: "sage1"  # Human-friendly identifier for this device
   user_phone: "+13238407486"    # Mac mini iMessage account
 
 backend:
@@ -15,16 +15,21 @@ websocket:
 imessage:
   poll_interval_seconds: 1  # Quick Win: Faster detection (0-1s vs 0-2s)
   db_path: "~/Library/Messages/chat.db"
+  attachments_path: "~/Library/Messages/Attachments"
+  transport_mode: "native_helper"  # native_helper or applescript
+  bridge_executable: "./native/messages-helper/.build/release/messages-helper"
+  bridge_args: []
 
 database:
   path: "./edge-agent.db"
+  state_path: "./data/edge-state.db"
 
 scheduler:
   adaptive_mode: true  # Phase 3: Adaptive scheduling for near-instant delivery
   check_interval_seconds: 30  # Fallback interval (used when adaptive_mode is false)
 
 logging:
-  level: "info"  # debug, info, warn, error
+  level: "debug"  # debug, info, warn, error
   file: "./edge-agent.log"
 
 monitoring:
@@ -41,3 +46,7 @@ monitoring:
   health_check:
     enabled: true  # Enable health check endpoint
     port: 3001  # Health check HTTP server port
+
+security:
+  keychain_service: "com.archety.edge"
+  keychain_account: "edge-state"

@@ -18,10 +18,11 @@ export class AppleScriptTransport implements IMessageTransport {
 
   constructor(
     dbPath: string,
+    attachmentsDir: string,
     logger: ILogger
   ) {
     this.logger = logger;
-    this.messagesDB = new MessagesDB(dbPath, logger);
+    this.messagesDB = new MessagesDB(dbPath, attachmentsDir, logger);
     this.sender = new AppleScriptSender(logger);
   }
 

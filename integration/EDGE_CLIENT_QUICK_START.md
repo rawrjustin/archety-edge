@@ -19,7 +19,7 @@ await axios.post(
   payload,
   {
     headers: {
-      'Authorization': `Bearer ${process.env.RELAY_WEBHOOK_SECRET}`,
+      'Authorization': `Bearer ${process.env.EDGE_SECRET}`,
       'Content-Type': 'application/json'
     }
   }
@@ -29,7 +29,7 @@ await axios.post(
 **Environment Variable:**
 ```bash
 # Add to .env
-RELAY_WEBHOOK_SECRET="your-shared-secret-here"
+EDGE_SECRET="your-shared-secret-here"
 
 # Generate secret (32 characters):
 openssl rand -hex 32
@@ -45,11 +45,11 @@ openssl rand -hex 32
 ```bash
 # Generate a secret
 SECRET=$(openssl rand -hex 32)
-echo "RELAY_WEBHOOK_SECRET=$SECRET" >> .env
+echo "EDGE_SECRET=$SECRET" >> .env
 
 # Send this secret to backend engineer to configure on Railway
 echo "Backend engineer: Add this to Railway environment variables:"
-echo "RELAY_WEBHOOK_SECRET=$SECRET"
+echo "EDGE_SECRET=$SECRET"
 ```
 
 ### Step 2: Update Your HTTP Client
@@ -60,7 +60,7 @@ import axios from 'axios';
 const orchestratorClient = axios.create({
   baseURL: process.env.BACKEND_URL,
   headers: {
-    'Authorization': `Bearer ${process.env.RELAY_WEBHOOK_SECRET}`,
+    'Authorization': `Bearer ${process.env.EDGE_SECRET}`,
     'Content-Type': 'application/json'
   },
   timeout: 10000
@@ -77,7 +77,7 @@ try {
   // Process response
 } catch (error) {
   if (error.response?.status === 401) {
-    console.error('❌ Auth failed - check RELAY_WEBHOOK_SECRET');
+    console.error('❌ Auth failed - check EDGE_SECRET');
   } else if (error.response?.status === 429) {
     const retryAfter = error.response.headers['retry-after'] || 60;
     console.warn(`⚠️ Rate limited - retry after ${retryAfter}s`);
@@ -90,7 +90,7 @@ try {
 ```bash
 # Test with curl
 curl -X POST https://archety-backend-dev.up.railway.app/orchestrator/message \
-  -H "Authorization: Bearer $RELAY_WEBHOOK_SECRET" \
+  -H "Authorization: Bearer $EDGE_SECRET" \
   -H "Content-Type: application/json" \
   -d '{
     "chat_guid": "test",

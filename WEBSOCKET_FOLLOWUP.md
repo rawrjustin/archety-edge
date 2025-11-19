@@ -169,7 +169,7 @@ asyncio.run(test())
 
 **HTTP API is working fine:**
 ```
-✅ POST /orchestrator/message (with RELAY_WEBHOOK_SECRET)
+✅ POST /edge/message (with EDGE_SECRET)
 ✅ Messages being processed
 ✅ Graceful HTTP polling fallback
 ```

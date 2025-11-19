@@ -28,7 +28,7 @@ await axios.post(
   payload,
   {
     headers: {
-      'Authorization': `Bearer ${RELAY_WEBHOOK_SECRET}`,
+      'Authorization': `Bearer ${EDGE_SECRET}`,
       'Content-Type': 'application/json'
     }
   }
@@ -38,11 +38,11 @@ await axios.post(
 **Configuration Required:**
 ```bash
 # Add to your .env file
-RELAY_WEBHOOK_SECRET="your-shared-secret-here"
+EDGE_SECRET="your-shared-secret-here"
 ```
 
 **⚠️ Important Notes:**
-- The backend will accept requests without auth if `RELAY_WEBHOOK_SECRET` is not configured, but this is ONLY for development
+- The backend will accept requests without auth if `EDGE_SECRET` is not configured, but this is ONLY for development
 - Production deployments MUST set this secret
 - The secret must match between edge client and backend
 - You'll get `401 Unauthorized` if the secret is missing or incorrect
@@ -69,7 +69,7 @@ const uploadResponse = await axios.post(
   {
     headers: {
       'Content-Type': 'multipart/form-data',
-      'Authorization': `Bearer ${RELAY_WEBHOOK_SECRET}`
+      'Authorization': `Bearer ${EDGE_SECRET}`
     },
     params: {
       user_phone: userPhone,
@@ -100,7 +100,7 @@ await axios.post(
   },
   {
     headers: {
-      'Authorization': `Bearer ${RELAY_WEBHOOK_SECRET}`
+      'Authorization': `Bearer ${EDGE_SECRET}`
     }
   }
 );
@@ -265,11 +265,11 @@ function generateHMACSignature(body: string, secret: string): { signature: strin
 
 // When HMAC is enabled:
 const body = JSON.stringify(payload);
-const { signature, timestamp } = generateHMACSignature(body, RELAY_WEBHOOK_SECRET);
+const { signature, timestamp } = generateHMACSignature(body, EDGE_SECRET);
 
 await axios.post(url, payload, {
   headers: {
-    'Authorization': `Bearer ${RELAY_WEBHOOK_SECRET}`,
+    'Authorization': `Bearer ${EDGE_SECRET}`,
     'X-Signature': signature,
     'X-Timestamp': timestamp.toString()
   }
@@ -287,7 +287,7 @@ await axios.post(url, payload, {
 ### Immediate (Required for Production)
 
 - [ ] **Add Bearer token authentication**
-  - [ ] Add `RELAY_WEBHOOK_SECRET` to environment variables
+  - [ ] Add `EDGE_SECRET` to environment variables
   - [ ] Update `/orchestrator/message` requests to include `Authorization: Bearer {secret}`
   - [ ] Test authentication with dev backend
   - [ ] Verify 401 error handling
@@ -328,7 +328,7 @@ await axios.post(url, payload, {
 **Headers:**
 ```
 Content-Type: application/json
-Authorization: Bearer {RELAY_WEBHOOK_SECRET}  # ⚠️ NEW - Required
+Authorization: Bearer {EDGE_SECRET}  # ⚠️ NEW - Required
 X-Signature: {hmac-sha256}                    # Future
 X-Timestamp: {unix-timestamp}                 # Future
 ```
@@ -392,7 +392,7 @@ X-Timestamp: {unix-timestamp}                 # Future
 BACKEND_URL=https://archety-backend-prod.up.railway.app
 
 # Authentication (REQUIRED for production)
-RELAY_WEBHOOK_SECRET=your-shared-secret-here
+EDGE_SECRET=your-shared-secret-here
 
 # User identification
 USER_PHONE=+15551234567
@@ -407,13 +407,13 @@ openssl rand -hex 32
 **Setting on Railway (Backend):**
 ```bash
 # The backend engineer will set this
-RELAY_WEBHOOK_SECRET=your-shared-secret-here
+EDGE_SECRET=your-shared-secret-here
 ```
 
 **Setting in Edge Client:**
 ```bash
 # Copy the same secret to your edge client
-export RELAY_WEBHOOK_SECRET=your-shared-secret-here
+export EDGE_SECRET=your-shared-secret-here
 ```
 
 ---
@@ -486,12 +486,11 @@ done
 **src/sync/client.ts:**
 ```typescript
 import axios from 'axios';
-import { EdgeAuth } from './auth';
 
 export class OrchestratorClient {
   constructor(
     private backendUrl: string,
-    private relaySecret: string
+    private edgeSecret: string
   ) {}
 
   async sendMessage(payload: {
@@ -509,7 +508,7 @@ export class OrchestratorClient {
         payload,
         {
           headers: {
-            'Authorization': `Bearer ${this.relaySecret}`,
+            'Authorization': `Bearer ${this.edgeSecret}`,
             'Content-Type': 'application/json'
           },
           timeout: 10000  // 10 second timeout
@@ -520,7 +519,7 @@ export class OrchestratorClient {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 401) {
-          console.error('❌ Authentication failed - check RELAY_WEBHOOK_SECRET');
+          console.error('❌ Authentication failed - check EDGE_SECRET');
           throw new Error('Authentication failed');
         } else if (error.response?.status === 429) {
           const retryAfter = error.response.headers['retry-after'] || 60;
@@ -538,7 +537,7 @@ export class OrchestratorClient {
 ```typescript
 const client = new OrchestratorClient(
   process.env.BACKEND_URL!,
-  process.env.RELAY_WEBHOOK_SECRET!
+  process.env.EDGE_SECRET!
 );
 
 const response = await client.sendMessage({
@@ -562,12 +561,12 @@ if (response.should_respond) {
 **Production:**
 - URL: `https://archety-backend-prod.up.railway.app`
 - Environment: `production`
-- RELAY_WEBHOOK_SECRET: ✅ Configured
+- EDGE_SECRET: ✅ Configured
 
 **Development:**
 - URL: `https://archety-backend-dev.up.railway.app`
 - Environment: `development`
-- RELAY_WEBHOOK_SECRET: ⚠️ May be disabled for easier testing
+- EDGE_SECRET: ⚠️ May be disabled for easier testing
 
 ---
 
@@ -609,7 +608,7 @@ if (response.should_respond) {
 
 1. **Add Bearer token authentication** (CRITICAL)
    - Add `Authorization: Bearer {secret}` to all `/orchestrator/message` requests
-   - Configure `RELAY_WEBHOOK_SECRET` environment variable
+   - Configure `EDGE_SECRET` environment variable
 
 2. **Handle rate limiting** (IMPORTANT)
    - Add 429 error handling

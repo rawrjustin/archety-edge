@@ -139,7 +139,6 @@ ADMIN_TOKEN=your-secret-token      # Custom admin token (optional)
 
 # Existing edge agent config
 EDGE_SECRET=your-edge-secret
-RELAY_WEBHOOK_SECRET=your-webhook-secret
 # ... other config
 ```
 

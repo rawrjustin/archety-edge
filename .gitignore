@@ -32,3 +32,10 @@ edge-agent.pid
 # Runtime data
 data/
 *.db
+
+# Swift build artifacts
+native/**/.build/
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+*.dSYM/

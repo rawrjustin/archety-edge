@@ -97,6 +97,12 @@ export function loadConfig(configPath: string = './config.yaml'): Config {
   config.backend.max_concurrent_requests = config.backend.max_concurrent_requests ?? profileDefaults.backend.max_concurrent_requests;
   config.imessage.enable_fast_check = config.imessage.enable_fast_check ?? profileDefaults.imessage.enable_fast_check;
   config.imessage.max_messages_per_poll = config.imessage.max_messages_per_poll ?? profileDefaults.imessage.max_messages_per_poll;
+  config.imessage.attachments_path = config.imessage.attachments_path
+    ?? path.join(process.env.HOME || '', 'Library', 'Messages', 'Attachments');
+  config.imessage.transport_mode = config.imessage.transport_mode ?? 'native_helper';
+  config.imessage.bridge_executable = config.imessage.bridge_executable
+    ?? path.join(process.cwd(), 'native', 'messages-helper', '.build', 'release', 'messages-helper');
+  config.imessage.bridge_args = config.imessage.bridge_args ?? [];
 
   // Apply scheduler defaults
   if (!config.scheduler) {
@@ -134,6 +140,23 @@ export function loadConfig(configPath: string = './config.yaml'): Config {
     /^~/,
     process.env.HOME || ''
   );
+  if (config.imessage.attachments_path) {
+    config.imessage.attachments_path = config.imessage.attachments_path.replace(
+      /^~/,
+      process.env.HOME || ''
+    );
+  }
+
+  if (!config.security) {
+    config.security = {};
+  }
+  config.security.keychain_service = config.security.keychain_service ?? 'com.archety.edge';
+  config.security.keychain_account = config.security.keychain_account ?? 'edge-state';
+
+  // Ensure state database path exists
+  if (!config.database.state_path) {
+    config.database.state_path = './data/edge-state.db';
+  }
 
   // Generate agent_id from phone number if not set
   if (!config.edge.agent_id || config.edge.agent_id === 'edge_15551234567') {

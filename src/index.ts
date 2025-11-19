@@ -363,12 +363,21 @@ class EdgeAgent {
       const activeContext = this.contextManager.getContext(message.threadId);
       const attachmentSummaries = await this.processMessageAttachments(message, activeContext);
 
+      // Filter out attachment placeholder character (￼) from text
+      const filteredText = message.text.replace(/\uFFFC/g, '').trim();
+
+      // Skip sending to /edge/message if this is a photo-only message with no text
+      if (!filteredText && attachmentSummaries.length > 0) {
+        this.logger.info('ℹ️  Photo-only message - skipping /edge/message (photos uploaded to /photo/upload)');
+        return;
+      }
+
       // Send to backend for processing
       this.logger.info(`⬆️  SENDING TO BACKEND: ${this.config.backend.url}/edge/message`);
       const backendRequest = {
         thread_id: message.threadId,
         sender: message.sender,
-        filtered_text: message.text,
+        filtered_text: filteredText,
         original_timestamp: message.timestamp.toISOString(),
         is_group: message.isGroup,
         participants: message.participants,
@@ -670,6 +679,11 @@ class EdgeAgent {
 
     this.logger.info(`📎 Message includes ${message.attachments.length} attachment(s)`);
 
+    // Debug: Log attachment details
+    for (const att of message.attachments) {
+      this.logger.debug(`  Attachment: guid=${att.guid}, uti=${att.uti}, mime=${att.mimeType}, path=${att.absolutePath}`);
+    }
+
     const backendContext = this.buildBackendContext(activeContext);
 
     for (const attachment of message.attachments) {
@@ -693,6 +707,7 @@ class EdgeAgent {
     }
 
     const prepared = await this.attachmentProcessor.prepareAttachments(message.attachments);
+    this.logger.debug(`📦 Prepared ${prepared.length} attachments`);
     const summaries: BackendAttachmentSummary[] = [];
 
     for (const item of prepared) {
@@ -704,6 +719,15 @@ class EdgeAgent {
         skipped: item.skipped,
         skip_reason: item.skipReason
       };
+
+      // Log attachment processing details
+      if (item.skipped) {
+        this.logger.warn(`⏭️  Skipping attachment ${item.attachment.guid}: ${item.skipReason}`);
+      } else if (!item.base64) {
+        this.logger.warn(`⏭️  Skipping attachment ${item.attachment.guid}: no base64 data`);
+      } else {
+        this.logger.info(`📤 Uploading photo ${item.attachment.guid} (${item.sizeBytes} bytes, ${item.mimeType})`);
+      }
 
       if (!item.skipped && item.base64) {
         try {

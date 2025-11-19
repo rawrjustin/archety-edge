@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import http from 'http';
 import https from 'https';
-import { IBackendClient, BackendMessageRequest, BackendMessageResponse } from '../interfaces/IBackendClient';
+import { IBackendClient, BackendMessageRequest, BackendMessageResponse, PhotoUploadRequest, PhotoUploadResponse } from '../interfaces/IBackendClient';
 import { SyncRequest, SyncResponse } from '../interfaces/ICommands';
 import { ILogger } from '../interfaces/ILogger';
 
@@ -141,7 +141,7 @@ export class RailwayClient implements IBackendClient {
 
         // Handle 401 Unauthorized - authentication failed
         if (error.response?.status === 401) {
-          this.logger.error(`[${requestId}] ❌ Authentication failed - check RELAY_WEBHOOK_SECRET matches backend`);
+          this.logger.error(`[${requestId}] ❌ Authentication failed - check EDGE_SECRET matches backend`);
           break; // Don't retry auth errors
         }
 
@@ -190,15 +190,83 @@ export class RailwayClient implements IBackendClient {
   }
 
   /**
+   * Upload a photo attachment using multipart/form-data
+   */
+  async uploadPhoto(request: PhotoUploadRequest): Promise<PhotoUploadResponse> {
+    const uploadId = `upload_${Date.now()}`;
+    this.logger.info(`[${uploadId}] 📸 Starting photo upload (guid=${request.attachment_guid})`);
+
+    const headers: any = {};
+    if (this.edgeAgentId) {
+      headers['X-Edge-Agent-Id'] = this.edgeAgentId;
+    }
+
+    // Convert base64 to Buffer
+    const photoBuffer = Buffer.from(request.photo_data, 'base64');
+    this.logger.debug(`[${uploadId}] Photo buffer size: ${photoBuffer.length} bytes`);
+
+    // Determine file extension from mime type
+    let extension = '.jpg';
+    if (request.mime_type === 'image/png') {
+      extension = '.png';
+    } else if (request.mime_type === 'image/gif') {
+      extension = '.gif';
+    } else if (request.mime_type?.includes('heic')) {
+      extension = '.heic';
+    }
+
+    const filename = request.attachment_guid ? `${request.attachment_guid}${extension}` : `photo_${Date.now()}${extension}`;
+    this.logger.debug(`[${uploadId}] Filename: ${filename}, Content-Type: ${request.mime_type || 'image/jpeg'}`);
+
+    // Create FormData for multipart upload
+    const FormData = require('form-data');
+    const formData = new FormData();
+
+    formData.append('file', photoBuffer, {
+      filename,
+      contentType: request.mime_type || 'image/jpeg'
+    });
+    formData.append('user_phone', request.user_phone);
+
+    if (request.attachment_guid) {
+      formData.append('attachment_guid', request.attachment_guid);
+    }
+
+    if (request.context) {
+      formData.append('context', JSON.stringify(request.context));
+    }
+
+    // Merge FormData headers with our custom headers
+    const uploadHeaders = {
+      ...headers,
+      ...formData.getHeaders()
+    };
+
+    this.logger.debug(`[${uploadId}] Upload headers:`, uploadHeaders);
+
+    try {
+      const response = await this.client.post('/photo/upload', formData, {
+        headers: uploadHeaders
+      });
+      this.logger.info(`[${uploadId}] ✅ Photo upload successful (photo_id=${response.data.photo_id})`);
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`[${uploadId}] ❌ Photo upload failed`);
+      if (error.response?.data) {
+        this.logger.error(`[${uploadId}] Backend error details:`, JSON.stringify(error.response.data));
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Sync with backend - send events and receive commands
-   * NOTE: The new backend architecture may not use this endpoint.
-   * Keeping for backward compatibility.
+   * NOTE: This is deprecated in the new WebSocket-based architecture.
+   * Kept for backward compatibility but returns empty response.
    */
   async sync(request: SyncRequest): Promise<SyncResponse> {
-    const syncId = `sync_${Date.now()}`;
-    this.logger.info(`[${syncId}] 🔄 Sync called (may not be supported in new backend)`);
-
-    // Return empty response - sync might not be needed in new architecture
+    // No-op in new WebSocket architecture - commands come via WebSocket
+    // Silently return empty response to avoid log spam
     return {
       commands: [],
       ack_events: []
@@ -207,16 +275,16 @@ export class RailwayClient implements IBackendClient {
 
   /**
    * Acknowledge command execution
-   * NOTE: Command acknowledgment may not be needed in new architecture.
-   * Keeping for backward compatibility.
+   * NOTE: This is deprecated - acknowledgments now sent via WebSocket.
+   * Kept for backward compatibility but does nothing.
    */
   async acknowledgeCommand(
     commandId: string,
     success: boolean,
     error?: string
   ): Promise<void> {
-    this.logger.debug(`Acknowledge command ${commandId} (may not be supported in new backend)`);
-    // No-op in new architecture
+    // No-op - acknowledgments now sent via WebSocket
+    // Silently return to avoid log spam
   }
 
   /**

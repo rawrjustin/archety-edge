@@ -57,11 +57,11 @@ response = requests.post(
 
 **After (secure):**
 ```python
-# ✅ Requires Authorization header with webhook secret
+# ✅ Requires Authorization header with edge secret
 response = requests.post(
     "https://archety-backend-prod.up.railway.app/orchestrator/message",
     headers={
-        "Authorization": f"Bearer {RELAY_WEBHOOK_SECRET}",
+        "Authorization": f"Bearer {EDGE_SECRET}",
         "Content-Type": "application/json"
     },
     json={
@@ -79,14 +79,14 @@ response = requests.post(
 
 ## Update Instructions
 
-### Step 1: Get Webhook Secret
+### Step 1: Get Edge Secret
 
-The webhook secret is stored in Railway environment variables as `RELAY_WEBHOOK_SECRET`.
+The shared edge secret is stored in Railway environment variables as `EDGE_SECRET`.
 
 **✅ Current Production Secret (November 13, 2025):**
 ```bash
 # Use this exact value for production and development
-export RELAY_WEBHOOK_SECRET="b3c7ddc616a155d9190252454fd82d1be3c9840dc5a0937defb78d948af70d81"
+export EDGE_SECRET="b3c7ddc616a155d9190252454fd82d1be3c9840dc5a0937defb78d948af70d81"
 ```
 
 ⚠️ **Security Note:** This secret is already configured in Railway for both dev and production environments. If you need to rotate it, follow these steps:
@@ -95,7 +95,7 @@ export RELAY_WEBHOOK_SECRET="b3c7ddc616a155d9190252454fd82d1be3c9840dc5a0937defb
 ```bash
 # Backend engineer can retrieve it from Railway dashboard
 # Or run this command:
-railway run --service archety-backend bash -c 'echo $RELAY_WEBHOOK_SECRET'
+railway run --service archety-backend bash -c 'echo $EDGE_SECRET'
 ```
 
 **Option B: Generate new secret (for rotation)**
@@ -116,7 +116,7 @@ Add the secret to your Mac mini edge client environment:
 **Option A: Environment variable**
 ```bash
 # Add to ~/.zshrc or ~/.bash_profile
-export RELAY_WEBHOOK_SECRET="your_secret_here_64_chars_long"
+export EDGE_SECRET="your_secret_here_64_chars_long"
 
 # Reload shell
 source ~/.zshrc
@@ -134,10 +134,10 @@ if ENV_FILE.exists():
     from dotenv import load_dotenv
     load_dotenv(ENV_FILE)
 
-RELAY_WEBHOOK_SECRET = os.getenv('RELAY_WEBHOOK_SECRET')
+EDGE_SECRET = os.getenv('EDGE_SECRET')
 
-if not RELAY_WEBHOOK_SECRET:
-    raise ValueError("RELAY_WEBHOOK_SECRET not set! Add to .env file or environment.")
+if not EDGE_SECRET:
+    raise ValueError("EDGE_SECRET not set! Add to .env file or environment.")
 ```
 
 **Option C: macOS Keychain (most secure)**
@@ -168,7 +168,7 @@ import requests
 import os
 
 BACKEND_URL = "https://archety-backend-prod.up.railway.app"
-RELAY_WEBHOOK_SECRET = os.getenv('RELAY_WEBHOOK_SECRET')
+EDGE_SECRET = os.getenv('EDGE_SECRET')
 
 def send_to_orchestrator(message_data: dict) -> dict:
     """
@@ -182,7 +182,7 @@ def send_to_orchestrator(message_data: dict) -> dict:
     """
     # ✅ NEW: Add Authorization header
     headers = {
-        "Authorization": f"Bearer {RELAY_WEBHOOK_SECRET}",
+        "Authorization": f"Bearer {EDGE_SECRET}",
         "Content-Type": "application/json"
     }
 
@@ -207,7 +207,7 @@ def sync_with_backend() -> dict:
     POST /edge/sync
     """
     headers = {
-        "Authorization": f"Bearer {RELAY_WEBHOOK_SECRET}",
+        "Authorization": f"Bearer {EDGE_SECRET}",
         "Content-Type": "application/json"
     }
 
@@ -256,13 +256,13 @@ from datetime import datetime
 
 # Configuration
 BACKEND_URL = os.getenv('ARCHETY_BACKEND_URL', 'https://archety-backend-prod.up.railway.app')
-RELAY_WEBHOOK_SECRET = os.getenv('RELAY_WEBHOOK_SECRET')
+EDGE_SECRET = os.getenv('EDGE_SECRET')
 EDGE_AGENT_ID = os.getenv('EDGE_AGENT_ID', 'mac-mini-primary')
 
 # Validate configuration
-if not RELAY_WEBHOOK_SECRET:
-    print("ERROR: RELAY_WEBHOOK_SECRET not set!")
-    print("Set it with: export RELAY_WEBHOOK_SECRET='your-secret-here'")
+if not EDGE_SECRET:
+    print("ERROR: EDGE_SECRET not set!")
+    print("Set it with: export EDGE_SECRET='your-secret-here'")
     sys.exit(1)
 
 # Setup logging
@@ -293,13 +293,13 @@ class ArchetyRelay:
 
     def __init__(self):
         self.backend_url = BACKEND_URL
-        self.webhook_secret = RELAY_WEBHOOK_SECRET
+        self.edge_secret = EDGE_SECRET
         self.edge_agent_id = EDGE_AGENT_ID
         self.session = requests.Session()
 
         # Set default headers for all requests
         self.session.headers.update({
-            'Authorization': f'Bearer {self.webhook_secret}',
+            'Authorization': f'Bearer {self.edge_secret}',
             'Content-Type': 'application/json',
             'User-Agent': f'Archety-Edge-Client/{self.edge_agent_id}'
         })
@@ -345,12 +345,12 @@ class ArchetyRelay:
 
             # Handle authentication errors
             if response.status_code == 401:
-                logger.error("❌ Authentication failed - invalid webhook secret")
-                logger.error("Check that RELAY_WEBHOOK_SECRET matches backend")
-                raise requests.HTTPError("Invalid webhook secret")
+                logger.error("❌ Authentication failed - invalid edge secret")
+                logger.error("Check that EDGE_SECRET matches backend")
+                raise requests.HTTPError("Invalid edge secret")
 
             if response.status_code == 403:
-                logger.error("❌ Forbidden - webhook secret valid but access denied")
+                logger.error("❌ Forbidden - edge secret valid but access denied")
                 raise requests.HTTPError("Access denied")
 
             response.raise_for_status()
@@ -494,11 +494,11 @@ python3 test_relay.py
 
 ```bash
 # Temporarily use wrong secret
-export RELAY_WEBHOOK_SECRET="wrong-secret"
+export EDGE_SECRET="wrong-secret"
 python3 test_relay.py
 
 # Expected output:
-# ❌ Authentication failed - invalid webhook secret
+# ❌ Authentication failed - invalid edge secret
 ```
 
 ### Step 3: Integration Test
@@ -515,12 +515,12 @@ python3 test_relay.py
 
 ### Issue: "401 Unauthorized" error
 
-**Cause:** Webhook secret doesn't match backend
+**Cause:** Edge secret doesn't match backend
 
 **Solution:**
-1. Check that `RELAY_WEBHOOK_SECRET` is set correctly:
+1. Check that `EDGE_SECRET` is set correctly:
    ```bash
-   echo $RELAY_WEBHOOK_SECRET
+   echo $EDGE_SECRET
    ```
 
 2. Verify it matches the backend secret in Railway:
@@ -532,8 +532,8 @@ python3 test_relay.py
 3. Make sure the Authorization header is formatted correctly:
    ```python
    headers = {
-       "Authorization": f"Bearer {RELAY_WEBHOOK_SECRET}",
-       # NOT: "Authorization": RELAY_WEBHOOK_SECRET
+       "Authorization": f"Bearer {EDGE_SECRET}",
+       # NOT: "Authorization": EDGE_SECRET
    }
    ```
 
@@ -606,7 +606,7 @@ response = requests.post(
 
 Before deploying to production edge client:
 
-- [ ] RELAY_WEBHOOK_SECRET is set and matches backend
+- [ ] EDGE_SECRET is set and matches backend
 - [ ] Edge client code updated with Authorization header
 - [ ] Health check passes
 - [ ] Test message sends successfully
@@ -623,7 +623,7 @@ Before deploying to production edge client:
 ```bash
 # Add to ~/.zshrc or create a startup script
 export ARCHETY_BACKEND_URL="https://archety-backend-prod.up.railway.app"
-export RELAY_WEBHOOK_SECRET="your-production-secret-here"
+export EDGE_SECRET="your-production-secret-here"
 export EDGE_AGENT_ID="mac-mini-primary"
 ```
 
@@ -631,7 +631,7 @@ export EDGE_AGENT_ID="mac-mini-primary"
 
 ```bash
 export ARCHETY_BACKEND_URL="https://archety-backend-dev.up.railway.app"
-export RELAY_WEBHOOK_SECRET="your-dev-secret-here"
+export EDGE_SECRET="your-dev-secret-here"
 export EDGE_AGENT_ID="mac-mini-dev"
 ```
 

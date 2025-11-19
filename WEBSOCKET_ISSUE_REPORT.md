@@ -85,7 +85,7 @@ Authorization: Bearer b3c7ddc616a155d9190252454fd82d1be3c9840dc5a0937defb78d948a
 
 **Questions:**
 - Does the endpoint expect `Authorization: Bearer {token}`?
-- Should we use `EDGE_SECRET` or `RELAY_WEBHOOK_SECRET`?
+- Is the token strictly the shared `EDGE_SECRET`?
 - Is there a different auth mechanism for WebSocket?
 
 ### 3. Is the EDGE_SECRET configured on Railway?
@@ -179,7 +179,6 @@ If the `/edge/ws` endpoint exists, please provide:
 
 3. **Environment variable name for authentication:**
    - Is it `EDGE_SECRET`?
-   - Or `RELAY_WEBHOOK_SECRET`?
    - Or something else?
 
 4. **Is it configured on Railway dev environment?**
@@ -203,7 +202,7 @@ The edge client gracefully falls back to HTTP polling when WebSocket fails:
 ```
 
 **Current behavior:**
-- ✅ HTTP API (`/orchestrator/message`) working with `RELAY_WEBHOOK_SECRET`
+- ✅ HTTP API (`/edge/message`) working with `EDGE_SECRET`
 - ❌ WebSocket failing
 - ✅ System continues to function via HTTP polling
 

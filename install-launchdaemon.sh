@@ -21,9 +21,10 @@ REAL_USER="${SUDO_USER:-$USER}"
 echo "Project directory: $PROJECT_DIR"
 echo "Running as user: $REAL_USER"
 
-# Ensure the project is built
-if [ ! -f "$PROJECT_DIR/dist/index.js" ]; then
-    echo "Error: Project not built. Run 'npm run build' first."
+# Ensure the project is built (admin portal server includes edge client)
+ENTRY_FILE="$PROJECT_DIR/dist/admin-portal/server/index.js"
+if [ ! -f "$ENTRY_FILE" ]; then
+    echo "Error: Admin portal not built. Run 'npm run admin:build' first."
     exit 1
 fi
 
@@ -61,7 +62,6 @@ if [ ! -f "$PROJECT_DIR/.env" ]; then
     echo "Error: .env file not found at $PROJECT_DIR/.env"
     echo "Please create .env file with required variables:"
     echo "  EDGE_SECRET=..."
-    echo "  RELAY_WEBHOOK_SECRET=..."
     echo "  BACKEND_URL=..."
     echo "  USER_PHONE=..."
     exit 1
@@ -69,18 +69,12 @@ fi
 
 # Read .env and extract variables (simple parsing - ignores comments and blank lines)
 EDGE_SECRET=$(grep "^EDGE_SECRET=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
-RELAY_WEBHOOK_SECRET=$(grep "^RELAY_WEBHOOK_SECRET=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
 BACKEND_URL=$(grep "^BACKEND_URL=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
 USER_PHONE=$(grep "^USER_PHONE=" "$PROJECT_DIR/.env" | cut -d '=' -f2-)
 
 # Validate required variables
 if [ -z "$EDGE_SECRET" ]; then
     echo "Error: EDGE_SECRET not found in .env"
-    exit 1
-fi
-
-if [ -z "$RELAY_WEBHOOK_SECRET" ]; then
-    echo "Error: RELAY_WEBHOOK_SECRET not found in .env"
     exit 1
 fi
 
@@ -96,7 +90,6 @@ fi
 
 echo "Environment variables loaded:"
 echo "  EDGE_SECRET: ${EDGE_SECRET:0:20}..."
-echo "  RELAY_WEBHOOK_SECRET: ${RELAY_WEBHOOK_SECRET:0:20}..."
 echo "  BACKEND_URL: $BACKEND_URL"
 echo "  USER_PHONE: $USER_PHONE"
 
@@ -111,7 +104,7 @@ cat > "$PLIST_DEST" << EOF
     <key>ProgramArguments</key>
     <array>
         <string>$NODE_PATH</string>
-        <string>$PROJECT_DIR/dist/index.js</string>
+        <string>$ENTRY_FILE</string>
     </array>
     <key>WorkingDirectory</key>
     <string>$PROJECT_DIR</string>
@@ -133,8 +126,6 @@ cat > "$PLIST_DEST" << EOF
         <string>$USER_HOME</string>
         <key>EDGE_SECRET</key>
         <string>$EDGE_SECRET</string>
-        <key>RELAY_WEBHOOK_SECRET</key>
-        <string>$RELAY_WEBHOOK_SECRET</string>
         <key>BACKEND_URL</key>
         <string>$BACKEND_URL</string>
         <key>USER_PHONE</key>

@@ -46,12 +46,61 @@ export interface SendMessageNowCommand {
   };
 }
 
+export interface ContextUpdateCommand {
+  command_type: 'context_update';
+  payload: {
+    chat_guid: string;
+    thread_id: string;
+    app_id: string;
+    room_id?: string;
+    state?: 'active' | 'completed';
+    metadata?: any;
+    notify_text?: string;
+  };
+}
+
+export interface ContextResetCommand {
+  command_type: 'context_reset';
+  payload: {
+    chat_guid: string;
+    thread_id: string;
+    reason?: string;
+    notify_text?: string;
+  };
+}
+
+export interface UploadRetryCommand {
+  command_type: 'upload_retry';
+  payload: {
+    attachment_guid: string;
+    chat_guid?: string;
+    thread_id?: string;
+    reason?: string;
+    retry_count?: number;
+  };
+}
+
+export interface EmitEventCommand {
+  command_type: 'emit_event';
+  payload: {
+    event_type: string;
+    chat_guid?: string;
+    thread_id?: string;
+    room_id?: string;
+    event_data?: any;
+  };
+}
+
 export type EdgeCommand =
   | ScheduleMessageCommand
   | CancelScheduledCommand
   | SetRuleCommand
   | UpdatePlanCommand
-  | SendMessageNowCommand;
+  | SendMessageNowCommand
+  | ContextUpdateCommand
+  | ContextResetCommand
+  | UploadRetryCommand
+  | EmitEventCommand;
 
 export interface EdgeCommandWrapper {
   command_id: string;

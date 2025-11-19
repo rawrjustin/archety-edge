@@ -157,7 +157,6 @@ export class AdminServer {
         WEBSOCKET_ENABLED: process.env.WEBSOCKET_ENABLED || 'not set',
         PERFORMANCE_PROFILE: process.env.PERFORMANCE_PROFILE || 'not set',
         EDGE_SECRET: process.env.EDGE_SECRET ? '***masked***' : 'not set',
-        RELAY_WEBHOOK_SECRET: process.env.RELAY_WEBHOOK_SECRET ? '***masked***' : 'not set',
       };
       res.json(env);
     });

@@ -6,11 +6,14 @@ import {
   CancelScheduledCommand,
   SetRuleCommand,
   UpdatePlanCommand,
-  SendMessageNowCommand
+  SendMessageNowCommand,
+  ContextUpdateCommand,
+  ContextResetCommand
 } from '../interfaces/ICommands';
 import { RuleEngine, Rule } from '../rules/RuleEngine';
 import { PlanManager } from '../plans/PlanManager';
 import { IMessageTransport } from '../interfaces/IMessageTransport';
+import { ContextManager } from '../context/ContextManager';
 
 /**
  * CommandHandler - Processes commands from backend
@@ -21,19 +24,22 @@ export class CommandHandler {
   private transport: IMessageTransport;
   private ruleEngine: RuleEngine | null = null;
   private planManager: PlanManager | null = null;
+  private contextManager: ContextManager | null = null;
 
   constructor(
     scheduler: Scheduler,
     transport: IMessageTransport,
     logger: ILogger,
     ruleEngine?: RuleEngine,
-    planManager?: PlanManager
+    planManager?: PlanManager,
+    contextManager?: ContextManager
   ) {
     this.scheduler = scheduler;
     this.transport = transport;
     this.logger = logger;
     this.ruleEngine = ruleEngine || null;
     this.planManager = planManager || null;
+    this.contextManager = contextManager || null;
   }
 
   /**
@@ -59,6 +65,12 @@ export class CommandHandler {
 
         case 'update_plan':
           return await this.handleUpdatePlan(command);
+
+        case 'context_update':
+          return await this.handleContextUpdate(command);
+
+        case 'context_reset':
+          return await this.handleContextReset(command);
 
         default:
           this.logger.warn(`Unknown command type: ${command.command_type}`);
@@ -315,6 +327,62 @@ export class CommandHandler {
         error: `Failed to update plan: ${error.message}`
       };
     }
+  }
+
+  /**
+   * Handle context_update command
+   */
+  private async handleContextUpdate(
+    command: EdgeCommandWrapper
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.contextManager) {
+      return { success: false, error: 'Context manager not initialized' };
+    }
+
+    const payload = command.payload as ContextUpdateCommand['payload'];
+    if (!payload.chat_guid || !payload.app_id || !payload.thread_id) {
+      return { success: false, error: 'chat_guid, app_id, and thread_id are required' };
+    }
+
+    this.contextManager.upsertContext({
+      chatGuid: payload.chat_guid,
+      appId: payload.app_id,
+      roomId: payload.room_id,
+      state: payload.state || 'active',
+      metadata: payload.metadata
+    });
+
+    if (payload.notify_text) {
+      const isGroup = payload.thread_id.includes('chat');
+      await this.transport.sendMessage(payload.thread_id, payload.notify_text, isGroup);
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Handle context_reset command
+   */
+  private async handleContextReset(
+    command: EdgeCommandWrapper
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.contextManager) {
+      return { success: false, error: 'Context manager not initialized' };
+    }
+
+    const payload = command.payload as ContextResetCommand['payload'];
+    if (!payload.chat_guid || !payload.thread_id) {
+      return { success: false, error: 'chat_guid and thread_id are required' };
+    }
+
+    this.contextManager.clearContext(payload.chat_guid);
+
+    if (payload.notify_text) {
+      const isGroup = payload.thread_id.includes('chat');
+      await this.transport.sendMessage(payload.thread_id, payload.notify_text, isGroup);
+    }
+
+    return { success: true };
   }
 
   /**
