@@ -110,7 +110,7 @@ class EdgeAgent {
 
     // Initialize scheduler
     const dbPath = this.config.database?.path || './data/scheduler.db';
-    this.scheduler = new Scheduler(dbPath, this.transport, this.logger);
+    this.scheduler = new Scheduler(dbPath, this.transport, this.logger, this.amplitude);
 
     // Initialize rule engine
     const rulesDbPath = this.config.database?.rules_path || './data/rules.db';
@@ -156,6 +156,10 @@ class EdgeAgent {
     this.wsClient.onConnected(() => {
       this.logger.info('🔌 WebSocket connected - real-time command delivery enabled');
       this.healthCheck.setWebSocketConnected(true);
+
+      // Track WebSocket connection
+      this.amplitude.trackWebSocketStatus('connected');
+
       // Reduce or stop HTTP polling when WebSocket is connected
       if (this.syncInterval) {
         clearInterval(this.syncInterval);
@@ -167,6 +171,10 @@ class EdgeAgent {
     this.wsClient.onDisconnected(() => {
       this.logger.warn('🔌 WebSocket disconnected - falling back to HTTP polling');
       this.healthCheck.setWebSocketConnected(false);
+
+      // Track WebSocket disconnection
+      this.amplitude.trackWebSocketStatus('disconnected');
+
       // Resume HTTP polling as fallback
       if (!this.syncInterval && this.isRunning) {
         this.startSyncLoop();
@@ -281,6 +289,8 @@ class EdgeAgent {
           this.logger.info('✅ WebSocket connected - real-time mode enabled');
         } else {
           this.logger.warn('⚠️  WebSocket connection failed - falling back to HTTP polling');
+          // Track WebSocket connection failure
+          this.amplitude.trackWebSocketStatus('failed', 'Initial connection failed');
           this.startSyncLoop();
         }
       } else {
@@ -352,6 +362,7 @@ class EdgeAgent {
    * Process a single message
    */
   private async processMessage(message: IncomingMessage): Promise<void> {
+    const processingStartTime = Date.now();
     try {
       this.logger.info('='.repeat(60));
       this.logger.info(`📨 INCOMING MESSAGE from ${message.sender}`);
@@ -359,6 +370,13 @@ class EdgeAgent {
       this.logger.info(`   Group: ${message.isGroup ? 'Yes' : 'No'}`);
       this.logger.info(`   Text: "${message.text}"`);
       this.logger.info('='.repeat(60));
+
+      // Track message received
+      this.amplitude.trackMessageReceived(
+        message.threadId,
+        message.isGroup,
+        (message.attachments?.length ?? 0) > 0
+      );
 
       const activeContext = this.contextManager.getContext(message.threadId);
       const attachmentSummaries = await this.processMessageAttachments(message, activeContext);
@@ -418,6 +436,14 @@ class EdgeAgent {
             message.isGroup
           );
 
+          // Track message sent
+          this.amplitude.trackMessageSent(
+            message.threadId,
+            message.isGroup,
+            'reflex',
+            reflexSent
+          );
+
           if (reflexSent) {
             this.logger.info('✅ Reflex message DELIVERED to iMessage');
           } else {
@@ -444,6 +470,14 @@ class EdgeAgent {
                 message.isGroup
               );
 
+              // Track burst messages sent
+              this.amplitude.trackMessageSent(
+                message.threadId,
+                message.isGroup,
+                'burst',
+                burstSent
+              );
+
               if (burstSent) {
                 this.logger.info('✅ All burst messages DELIVERED to iMessage');
               } else {
@@ -467,6 +501,14 @@ class EdgeAgent {
             message.isGroup
           );
 
+          // Track multi-bubble message sent
+          this.amplitude.trackMessageSent(
+            message.threadId,
+            message.isGroup,
+            'multi',
+            sent
+          );
+
           if (sent) {
             this.logger.info('✅ All bubbles DELIVERED to iMessage');
           } else {
@@ -486,6 +528,14 @@ class EdgeAgent {
             message.isGroup
           );
 
+          // Track single message sent
+          this.amplitude.trackMessageSent(
+            message.threadId,
+            message.isGroup,
+            'single',
+            sent
+          );
+
           if (sent) {
             this.logger.info('✅ Response DELIVERED to iMessage');
           } else {
@@ -497,6 +547,17 @@ class EdgeAgent {
       }
     } catch (error: any) {
       this.logger.error('Error processing message:', error.message);
+
+      // Track error
+      this.amplitude.trackError(
+        'message_processing',
+        error.message,
+        {
+          thread_id: message.threadId,
+          is_group: message.isGroup,
+          component: 'EdgeAgent.processMessage'
+        }
+      );
     }
   }
 
@@ -575,6 +636,7 @@ class EdgeAgent {
    * Process a command from the backend
    */
   private async processCommand(command: EdgeCommandWrapper): Promise<void> {
+    const commandStartTime = Date.now();
     try {
       // Log command priority if specified
       if (command.priority === 'immediate') {
@@ -584,12 +646,20 @@ class EdgeAgent {
       if (command.command_type === 'upload_retry') {
         const retryResult = await this.handleUploadRetryCommand(command);
         await this.acknowledgeCommandResult(command, retryResult.success, retryResult.error);
+
+        // Track command execution
+        const durationMs = Date.now() - commandStartTime;
+        this.amplitude.trackCommandProcessed(command.command_type, retryResult.success, durationMs);
         return;
       }
 
       if (command.command_type === 'emit_event') {
         const eventResult = await this.handleEmitEventCommand(command);
         await this.acknowledgeCommandResult(command, eventResult.success, eventResult.error);
+
+        // Track command execution
+        const durationMs = Date.now() - commandStartTime;
+        this.amplitude.trackCommandProcessed(command.command_type, eventResult.success, durationMs);
         return;
       }
 
@@ -601,6 +671,10 @@ class EdgeAgent {
 
       await this.acknowledgeCommandResult(command, result.success, result.error);
 
+      // Track command execution
+      const durationMs = Date.now() - commandStartTime;
+      this.amplitude.trackCommandProcessed(command.command_type, result.success, durationMs);
+
       if (result.success) {
         this.logger.info(`✅ Command ${command.command_id} executed successfully`);
       } else {
@@ -609,6 +683,19 @@ class EdgeAgent {
     } catch (error: any) {
       this.logger.error(`Error processing command ${command.command_id}:`, error.message);
       await this.acknowledgeCommandResult(command, false, error.message);
+
+      // Track command error
+      const durationMs = Date.now() - commandStartTime;
+      this.amplitude.trackCommandProcessed(command.command_type, false, durationMs);
+      this.amplitude.trackError(
+        'command_processing',
+        error.message,
+        {
+          command_type: command.command_type,
+          command_id: command.command_id,
+          component: 'EdgeAgent.processCommand'
+        }
+      );
     }
   }
 
@@ -730,6 +817,16 @@ class EdgeAgent {
       }
 
       if (!item.skipped && item.base64) {
+        const uploadStartTime = Date.now();
+
+        // Track photo upload started
+        this.amplitude.trackPhotoUploadStarted(
+          item.attachment.guid,
+          item.mimeType,
+          item.sizeBytes ?? 0,
+          message.threadId
+        );
+
         try {
           const uploadResponse = await this.backend.uploadPhoto({
             photo_data: item.base64,
@@ -741,10 +838,28 @@ class EdgeAgent {
             context: backendContext
           });
 
+          const uploadDurationMs = Date.now() - uploadStartTime;
+
+          // Track photo upload completed
+          this.amplitude.trackPhotoUploadCompleted(
+            item.attachment.guid,
+            uploadResponse.photo_id,
+            item.sizeBytes ?? 0,
+            uploadDurationMs,
+            uploadResponse.transcoded ?? false
+          );
+
           summary.uploaded_photo_id = uploadResponse.photo_id;
           this.attachmentCache.markUploaded(item.attachment.guid, uploadResponse.photo_id);
           this.logger.info(`📸 Uploaded attachment ${item.attachment.guid} (photo_id=${uploadResponse.photo_id})`);
         } catch (error: any) {
+          // Track photo upload failed
+          this.amplitude.trackPhotoUploadFailed(
+            item.attachment.guid,
+            error.message,
+            item.sizeBytes ?? 0
+          );
+
           summary.skipped = true;
           summary.skip_reason = 'upload_failed';
           this.logger.error(`❌ Failed to upload attachment ${item.attachment.guid}: ${error.message}`);

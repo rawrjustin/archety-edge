@@ -40,8 +40,8 @@ monitoring:
     traces_sample_rate: 0.1  # 10% of transactions for performance monitoring
     profiles_sample_rate: 0.1  # 10% profiling
   amplitude:
-    enabled: false  # Set to true and add API key to enable analytics
-    # api_key: "your-amplitude-api-key"
+    enabled: true  # Set to true and add API key to enable analytics
+    api_key: "${AMPLITUDE_API_KEY}"  # Set via environment variable
     flush_interval_ms: 10000  # Flush events every 10 seconds
   health_check:
     enabled: true  # Enable health check endpoint

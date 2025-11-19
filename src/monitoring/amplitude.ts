@@ -317,4 +317,317 @@ export class AmplitudeAnalytics {
   isInitialized(): boolean {
     return this.initialized;
   }
+
+  // ========================
+  // Backend Communication
+  // ========================
+
+  /**
+   * Track backend request started
+   */
+  trackBackendRequestStarted(endpoint: string, requestId: string): void {
+    this.trackEvent('backend_request_started', {
+      endpoint,
+      request_id: requestId,
+    });
+  }
+
+  /**
+   * Track backend request completed
+   */
+  trackBackendRequestCompleted(
+    endpoint: string,
+    requestId: string,
+    statusCode: number,
+    latencyMs: number,
+    retryCount: number = 0
+  ): void {
+    this.trackEvent('backend_request_completed', {
+      endpoint,
+      request_id: requestId,
+      status_code: statusCode,
+      latency_ms: latencyMs,
+      retry_count: retryCount,
+    });
+  }
+
+  /**
+   * Track backend request failed
+   */
+  trackBackendRequestFailed(
+    endpoint: string,
+    requestId: string,
+    errorType: string,
+    statusCode?: number
+  ): void {
+    this.trackEvent('backend_request_failed', {
+      endpoint,
+      request_id: requestId,
+      error_type: errorType,
+      status_code: statusCode,
+    });
+
+    this.incrementUserProperty('total_backend_failures');
+  }
+
+  // ========================
+  // Photo Uploads
+  // ========================
+
+  /**
+   * Track photo upload started
+   */
+  trackPhotoUploadStarted(
+    attachmentGuid: string,
+    mimeType: string,
+    sizeBytes: number,
+    threadId: string
+  ): void {
+    this.trackEvent('photo_upload_started', {
+      attachment_guid: attachmentGuid,
+      mime_type: mimeType,
+      size_bytes: sizeBytes,
+      thread_id: threadId,
+    });
+  }
+
+  /**
+   * Track photo upload completed
+   */
+  trackPhotoUploadCompleted(
+    attachmentGuid: string,
+    photoId: string,
+    sizeBytes: number,
+    uploadDurationMs: number,
+    transcoded: boolean
+  ): void {
+    this.trackEvent('photo_upload_completed', {
+      attachment_guid: attachmentGuid,
+      photo_id: photoId,
+      size_bytes: sizeBytes,
+      upload_duration_ms: uploadDurationMs,
+      transcoded,
+    });
+
+    this.incrementUserProperty('total_photos_uploaded');
+  }
+
+  /**
+   * Track photo upload failed
+   */
+  trackPhotoUploadFailed(
+    attachmentGuid: string,
+    errorReason: string,
+    sizeBytes: number
+  ): void {
+    this.trackEvent('photo_upload_failed', {
+      attachment_guid: attachmentGuid,
+      error_reason: errorReason,
+      size_bytes: sizeBytes,
+    });
+
+    this.incrementUserProperty('total_photo_upload_failures');
+  }
+
+  // ========================
+  // Scheduled Messages
+  // ========================
+
+  /**
+   * Track scheduled message execution
+   */
+  trackScheduledMessageExecuted(
+    scheduleId: number,
+    scheduledTime: string,
+    actualTime: string,
+    latencyMs: number,
+    success: boolean
+  ): void {
+    this.trackEvent('message_schedule_executed', {
+      schedule_id: scheduleId,
+      scheduled_time: scheduledTime,
+      actual_time: actualTime,
+      latency_ms: latencyMs,
+      success,
+    });
+
+    if (success) {
+      this.incrementUserProperty('scheduled_messages_sent');
+    } else {
+      this.incrementUserProperty('scheduled_messages_failed');
+    }
+  }
+
+  // ========================
+  // Plans & Context
+  // ========================
+
+  /**
+   * Track plan created
+   */
+  trackPlanCreated(threadId: string, planType: string): void {
+    this.trackEvent('plan_created', {
+      thread_id: threadId,
+      plan_type: planType,
+    });
+
+    this.incrementUserProperty('total_plans_created');
+  }
+
+  /**
+   * Track plan updated
+   */
+  trackPlanUpdated(threadId: string, version: number): void {
+    this.trackEvent('plan_updated', {
+      thread_id: threadId,
+      version,
+    });
+
+    this.incrementUserProperty('total_plan_updates');
+  }
+
+  /**
+   * Track context created
+   */
+  trackContextCreated(chatGuid: string, appId: string, roomId: string): void {
+    this.trackEvent('context_created', {
+      chat_guid: chatGuid,
+      app_id: appId,
+      room_id: roomId,
+    });
+
+    this.incrementUserProperty('total_contexts_created');
+  }
+
+  /**
+   * Track context completed
+   */
+  trackContextCompleted(chatGuid: string, appId: string, durationSeconds: number): void {
+    this.trackEvent('context_completed', {
+      chat_guid: chatGuid,
+      app_id: appId,
+      duration_seconds: durationSeconds,
+    });
+
+    this.incrementUserProperty('total_contexts_completed');
+  }
+
+  /**
+   * Track context cleared
+   */
+  trackContextCleared(chatGuid: string, reason: string): void {
+    this.trackEvent('context_cleared', {
+      chat_guid: chatGuid,
+      reason,
+    });
+
+    this.incrementUserProperty('total_contexts_cleared');
+  }
+
+  // ========================
+  // Admin Portal
+  // ========================
+
+  /**
+   * Track admin portal accessed
+   */
+  trackAdminPortalAccessed(page: string, userIpMasked: string): void {
+    this.trackEvent('admin_portal_accessed', {
+      page,
+      user_ip: userIpMasked, // Only last octet masked
+    });
+
+    this.incrementUserProperty('admin_portal_accesses');
+  }
+
+  /**
+   * Track admin config updated
+   */
+  trackAdminConfigUpdated(fieldsChanged: string[]): void {
+    this.trackEvent('admin_config_updated', {
+      fields_changed: fieldsChanged,
+      fields_count: fieldsChanged.length,
+    });
+
+    this.incrementUserProperty('admin_config_updates');
+  }
+
+  /**
+   * Track admin service restarted
+   */
+  trackAdminServiceRestarted(): void {
+    this.trackEvent('admin_service_restarted', {});
+    this.incrementUserProperty('admin_service_restarts');
+  }
+
+  /**
+   * Track admin test message sent
+   */
+  trackAdminTestMessageSent(threadId: string, success: boolean): void {
+    this.trackEvent('admin_test_message_sent', {
+      thread_id: threadId,
+      success,
+    });
+
+    if (success) {
+      this.incrementUserProperty('admin_test_messages_sent');
+    }
+  }
+
+  // ========================
+  // Native Bridge & Transport
+  // ========================
+
+  /**
+   * Track native bridge started
+   */
+  trackNativeBridgeStarted(): void {
+    this.trackEvent('native_bridge_started', {});
+    this.incrementUserProperty('native_bridge_starts');
+  }
+
+  /**
+   * Track native bridge message received
+   */
+  trackNativeBridgeMessageReceived(messageCount: number, batchSize: number): void {
+    this.trackEvent('native_bridge_message_received', {
+      message_count: messageCount,
+      batch_size: batchSize,
+    });
+  }
+
+  /**
+   * Track native bridge error
+   */
+  trackNativeBridgeError(errorType: string, errorMessage: string): void {
+    this.trackEvent('native_bridge_error', {
+      error_type: errorType,
+      error_message: errorMessage,
+    });
+
+    this.incrementUserProperty('native_bridge_errors');
+  }
+
+  /**
+   * Track AppleScript execution
+   */
+  trackAppleScriptExecution(
+    operation: string,
+    success: boolean,
+    durationMs: number,
+    bubbleCount?: number
+  ): void {
+    this.trackEvent('applescript_execution', {
+      operation,
+      success,
+      duration_ms: durationMs,
+      bubble_count: bubbleCount,
+    });
+
+    if (success) {
+      this.incrementUserProperty(`applescript_${operation}_success`);
+    } else {
+      this.incrementUserProperty(`applescript_${operation}_failed`);
+    }
+  }
 }

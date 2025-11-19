@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { ILogger } from '../interfaces/ILogger';
 import { IMessageTransport } from '../interfaces/IMessageTransport';
+import { AmplitudeAnalytics } from '../monitoring/amplitude';
 
 /**
  * Scheduled message interface
@@ -26,6 +27,7 @@ export class Scheduler {
   private db: Database.Database;
   private logger: ILogger;
   private transport: IMessageTransport;
+  private amplitude: AmplitudeAnalytics | null = null;
   private checkInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private adaptiveMode: boolean = true; // Phase 3: Adaptive scheduling
@@ -35,10 +37,12 @@ export class Scheduler {
   constructor(
     dbPath: string,
     transport: IMessageTransport,
-    logger: ILogger
+    logger: ILogger,
+    amplitude?: AmplitudeAnalytics
   ) {
     this.logger = logger;
     this.transport = transport;
+    this.amplitude = amplitude || null;
 
     // Initialize database
     this.db = new Database(dbPath);
@@ -103,6 +107,11 @@ export class Scheduler {
     );
 
     this.logger.info(`Scheduled message ${id} for ${sendAt.toISOString()}`);
+
+    // Track scheduled message
+    if (this.amplitude) {
+      this.amplitude.trackScheduledMessage(sendAt.toISOString(), true);
+    }
 
     // Reschedule next check if in adaptive mode and scheduler is running
     // This ensures newly added messages don't wait for the current timeout
@@ -397,6 +406,10 @@ export class Scheduler {
    * Execute a scheduled message (already atomically claimed as 'sent')
    */
   private async executeSendMessage(message: ScheduledMessage): Promise<void> {
+    const actualTime = new Date();
+    const scheduledTime = new Date(message.send_at);
+    const latencyMs = actualTime.getTime() - scheduledTime.getTime();
+
     try {
       this.logger.info('='.repeat(60));
       this.logger.info(`🔔 SENDING SCHEDULED MESSAGE`);
@@ -415,6 +428,17 @@ export class Scheduler {
         message.message_text,
         message.is_group
       );
+
+      // Track scheduled message execution
+      if (this.amplitude) {
+        this.amplitude.trackScheduledMessageExecuted(
+          parseInt(message.id.replace(/-/g, '').substring(0, 8), 16), // Simple numeric ID from UUID
+          scheduledTime.toISOString(),
+          actualTime.toISOString(),
+          latencyMs,
+          success
+        );
+      }
 
       if (success) {
         this.logger.info(`✅ Scheduled message ${message.id} sent successfully`);
