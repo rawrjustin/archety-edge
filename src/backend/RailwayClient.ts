@@ -19,16 +19,18 @@ export class RailwayClient implements IBackendClient {
   private logger: ILogger;
   private edgeSecret: string;
   private userPhone: string;
-  private edgeAgentId: string | null = null;
+  private edgeAgentId: string;
 
   constructor(
     private backendUrl: string,
     userPhone: string,
     edgeSecret: string,
+    edgeAgentId: string,
     logger: ILogger
   ) {
     this.userPhone = userPhone;
     this.edgeSecret = edgeSecret;
+    this.edgeAgentId = edgeAgentId;
     this.logger = logger;
 
     // Create axios instance with connection pooling and Bearer auth
@@ -83,9 +85,7 @@ export class RailwayClient implements IBackendClient {
    */
   async register(): Promise<string> {
     this.logger.info('📝 Registration not required in new backend architecture');
-    // Generate a simple agent ID from phone number
-    const phoneDigits = this.userPhone.replace(/[^0-9]/g, '');
-    this.edgeAgentId = `edge_${phoneDigits}`;
+    // Return the agent ID from config (no longer auto-generated)
     return this.edgeAgentId;
   }
 
@@ -227,6 +227,9 @@ export class RailwayClient implements IBackendClient {
       contentType: request.mime_type || 'image/jpeg'
     });
     formData.append('user_phone', request.user_phone);
+    formData.append('edge_agent_id', request.edge_agent_id);
+
+    this.logger.debug(`[${uploadId}] Form data: user_phone=${request.user_phone}, edge_agent_id=${request.edge_agent_id}`);
 
     if (request.attachment_guid) {
       formData.append('attachment_guid', request.attachment_guid);

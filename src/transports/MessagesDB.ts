@@ -110,9 +110,13 @@ export class MessagesDB {
 
         const attachments = this.getAttachmentsForMessage(row.id);
 
+        // For 1-on-1 chats where is_from_me = 0, the sender is the thread_id (the other person)
+        // For group chats, use the handle from the database
+        const sender = isGroup ? (row.sender || 'unknown') : row.thread_id;
+
         messages.push({
           threadId: row.thread_id,
-          sender: row.sender || 'unknown',
+          sender,
           text: row.text || '',
           timestamp,
           isGroup,

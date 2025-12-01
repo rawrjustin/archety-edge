@@ -9,6 +9,7 @@ export interface AttachmentCacheRecord {
   guid: string;
   attachmentId?: number;
   threadId: string;
+  sender?: string;
   isGroup: boolean;
   participants: string[];
   filename?: string;
@@ -43,6 +44,7 @@ export class AttachmentCache {
     const merged: AttachmentCacheRecord = {
       ...existing,
       ...record,
+      sender: record.sender || existing?.sender,
       participants: record.participants && record.participants.length > 0
         ? record.participants
         : existing?.participants || [],

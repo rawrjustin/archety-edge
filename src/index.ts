@@ -99,6 +99,7 @@ class EdgeAgent {
       this.config.backend.url,
       this.config.edge.user_phone,
       edgeSecret,
+      this.config.edge.agent_id,
       this.logger
     );
 
@@ -359,6 +360,12 @@ class EdgeAgent {
       this.logger.info(`   Group: ${message.isGroup ? 'Yes' : 'No'}`);
       this.logger.info(`   Text: "${message.text}"`);
       this.logger.info('='.repeat(60));
+
+      // Filter out messages from the edge client's own phone number to prevent loops
+      if (message.sender === this.config.edge.user_phone) {
+        this.logger.info(`⏭️  Skipping message from edge client's own number (${message.sender}) to prevent loop`);
+        return;
+      }
 
       const activeContext = this.contextManager.getContext(message.threadId);
       const attachmentSummaries = await this.processMessageAttachments(message, activeContext);
@@ -691,6 +698,7 @@ class EdgeAgent {
         guid: attachment.guid,
         attachmentId: attachment.id,
         threadId: message.threadId,
+        sender: message.sender,
         isGroup: message.isGroup,
         participants: message.participants,
         filename: attachment.filename,
@@ -733,7 +741,8 @@ class EdgeAgent {
         try {
           const uploadResponse = await this.backend.uploadPhoto({
             photo_data: item.base64,
-            user_phone: this.config.edge.user_phone,
+            user_phone: message.sender,
+            edge_agent_id: this.config.edge.agent_id,
             chat_guid: message.threadId,
             mime_type: item.mimeType,
             size_bytes: item.sizeBytes ?? undefined,
@@ -804,7 +813,8 @@ class EdgeAgent {
     try {
       const uploadResponse = await this.backend.uploadPhoto({
         photo_data: item.base64,
-        user_phone: this.config.edge.user_phone,
+        user_phone: record.sender || this.config.edge.user_phone,
+        edge_agent_id: this.config.edge.agent_id,
         chat_guid: record.threadId,
         mime_type: item.mimeType,
         size_bytes: item.sizeBytes ?? undefined,

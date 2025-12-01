@@ -14,8 +14,8 @@ websocket:
 
 imessage:
   poll_interval_seconds: 1  # Quick Win: Faster detection (0-1s vs 0-2s)
-  db_path: "~/Library/Messages/chat.db"
-  attachments_path: "~/Library/Messages/Attachments"
+  db_path: "/Users/sage1/Library/Messages/chat.db"
+  attachments_path: "/Users/sage1/Library/Messages/Attachments"
   transport_mode: "native_helper"  # native_helper or applescript
   bridge_executable: "./native/messages-helper/.build/release/messages-helper"
   bridge_args: []

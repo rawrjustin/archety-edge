@@ -60,6 +60,7 @@ export interface BackendAttachmentSummary {
 export interface PhotoUploadRequest {
   photo_data: string;
   user_phone: string;
+  edge_agent_id: string;
   chat_guid: string;
   mime_type?: string;
   size_bytes?: number;
