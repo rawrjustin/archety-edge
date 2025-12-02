@@ -35,17 +35,22 @@ export type IncomingMessage = z.infer<typeof IncomingMessageSchema>;
 
 /**
  * Zod schema for backend message request
+ * Matches the backend OrchestratorRequest schema
  */
 export const BackendMessageRequestSchema = z.object({
-  thread_id: z.string().min(1),
-  sender: z.string().min(1),
-  filtered_text: z.string(),
-  original_timestamp: z.string(),
-  is_group: z.boolean(),
-  participants: z.array(z.string()),
-  was_redacted: z.boolean(),
-  redacted_fields: z.array(z.string()),
-  filter_reason: z.string(),
+  chat_guid: z.string().min(1),       // Unique conversation ID
+  mode: z.enum(['direct', 'group']),   // Conversation mode
+  sender: z.string().min(1),           // Phone number or Apple ID
+  text: z.string(),                    // Message text (max 50,000 chars)
+  timestamp: z.number(),               // Unix timestamp
+  participants: z.array(z.string()),   // All participants in conversation
+  metadata: z.object({
+    is_first_message: z.boolean().optional(),
+    mentioned_sage: z.boolean().optional(),
+    was_redacted: z.boolean().optional(),
+    redacted_fields: z.array(z.string()).optional(),
+    filter_reason: z.string().optional()
+  }).passthrough().optional(),
   context: z.object({
     active_miniapp: z.string().optional(),
     room_id: z.string().optional(),

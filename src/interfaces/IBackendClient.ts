@@ -6,15 +6,20 @@
 import { SyncRequest, SyncResponse } from './ICommands';
 
 export interface BackendMessageRequest {
-  thread_id: string;
-  sender: string;
-  filtered_text: string;
-  original_timestamp: string;
-  is_group: boolean;
-  participants: string[];
-  was_redacted?: boolean;
-  redacted_fields?: string[];
-  filter_reason: string;
+  chat_guid: string;           // Unique conversation ID (e.g., "iMessage;-;+15551234567")
+  mode: 'direct' | 'group';    // Conversation mode
+  sender: string;              // Phone number or Apple ID
+  text: string;                // Message text
+  timestamp: number;           // Unix timestamp
+  participants: string[];      // All participants in conversation
+  metadata?: {                 // Optional metadata
+    is_first_message?: boolean;
+    mentioned_sage?: boolean;
+    was_redacted?: boolean;
+    redacted_fields?: string[];
+    filter_reason?: string;
+    [key: string]: any;
+  };
   context?: BackendMiniAppContext;
   attachments?: BackendAttachmentSummary[];
 }

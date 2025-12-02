@@ -8,9 +8,11 @@ describe('MessagesDB', () => {
   let mockLogger: MockLogger;
   let testDbPath: string;
   let testDb: Database.Database;
+  let testAttachmentsDir: string;
 
   beforeEach(() => {
     mockLogger = new MockLogger();
+    testAttachmentsDir = '/tmp/test-attachments';
 
     // Create a test Messages database with the expected schema
     testDbPath = path.join(__dirname, `test-messages-${Date.now()}.db`);
@@ -57,7 +59,7 @@ describe('MessagesDB', () => {
 
   describe('constructor', () => {
     it('should open database successfully', () => {
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       expect(messagesDB).toBeDefined();
       expect(mockLogger.infoMessages.some(msg =>
@@ -71,7 +73,7 @@ describe('MessagesDB', () => {
       const nonExistentPath = '/tmp/non-existent-db.db';
 
       expect(() => {
-        new MessagesDB(nonExistentPath, mockLogger);
+        new MessagesDB(nonExistentPath, testAttachmentsDir, mockLogger);
       }).toThrow('Messages database not found');
     });
 
@@ -80,7 +82,7 @@ describe('MessagesDB', () => {
       testDb.prepare('INSERT INTO message (ROWID, text) VALUES (?, ?)').run(1, 'Test 1');
       testDb.prepare('INSERT INTO message (ROWID, text) VALUES (?, ?)').run(2, 'Test 2');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       expect(mockLogger.infoMessages.some(msg =>
         msg.includes('Starting from message ID: 2')
@@ -90,7 +92,7 @@ describe('MessagesDB', () => {
     });
 
     it('should handle empty database', () => {
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       expect(mockLogger.infoMessages.some(msg =>
         msg.includes('Starting from message ID: 0')
@@ -106,10 +108,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Insert a new message (after initialization)
       const messageId = 10;
@@ -126,10 +128,11 @@ describe('MessagesDB', () => {
 
       expect(messages.length).toBe(1);
       expect(messages[0].text).toBe(messageText);
-      expect(messages[0].threadId).toBe('iMessage;-;+15551234567');
+      expect(messages[0].threadId).toBe('+15551234567');
+      // For 1:1 chats, sender is derived from thread_id
       expect(messages[0].sender).toBe('+15551234567');
-      // Note: The logic checks for ';-;' OR 'chat', so this will be detected as group
-      expect(messages[0].isGroup).toBe(true);
+      // Direct chat (phone number format), not a group
+      expect(messages[0].isGroup).toBe(false);
 
       messagesDB.close();
     });
@@ -138,10 +141,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Insert multiple messages
       const appleDate = 694224000000000000;
@@ -174,7 +177,7 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
       // Insert first message before initialization
@@ -184,7 +187,7 @@ describe('MessagesDB', () => {
       );
       testDb.prepare('INSERT INTO chat_message_join (chat_id, message_id) VALUES (?, ?)').run(chatId, 10);
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // First poll should return nothing (old message is before initialization)
       let messages = await messagesDB.pollNewMessages();
@@ -208,10 +211,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Insert message from me (is_from_me = 1)
       const appleDate = 694224000000000000;
@@ -231,10 +234,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Insert message with NULL text (e.g., attachment only)
       const appleDate = 694224000000000000;
@@ -254,11 +257,11 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      // Group chat identifier (has 'chat' in it)
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;+;chat123456');
+      // Group chat identifier starts with 'chat' (e.g., chat655304561542537998)
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'chat123456789');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
@@ -282,7 +285,7 @@ describe('MessagesDB', () => {
       testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
@@ -302,10 +305,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Use a known Apple date
       // Apple epoch is 2001-01-01, and dates are in nanoseconds
@@ -325,15 +328,16 @@ describe('MessagesDB', () => {
       messagesDB.close();
     });
 
-    it('should handle messages with no sender gracefully', async () => {
+    it('should handle messages with no sender gracefully in group chat', async () => {
       const chatId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      // Use group chat identifier (starts with 'chat') to test unknown sender fallback
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'chat123456789');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
-      // Insert message with no handle_id
+      // Insert message with no handle_id - in group chat, sender falls back to 'unknown'
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
         10, 'Unknown sender', appleDate, 0, null
       );
@@ -343,6 +347,31 @@ describe('MessagesDB', () => {
 
       expect(messages.length).toBe(1);
       expect(messages[0].sender).toBe('unknown');
+      expect(messages[0].isGroup).toBe(true);
+
+      messagesDB.close();
+    });
+
+    it('should derive sender from thread_id for 1:1 chats', async () => {
+      const chatId = 1;
+
+      // 1:1 chat - sender is derived from thread_id even if handle is missing
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
+
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
+
+      const appleDate = 694224000000000000;
+      testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
+        10, 'Direct message', appleDate, 0, null
+      );
+      testDb.prepare('INSERT INTO chat_message_join (chat_id, message_id) VALUES (?, ?)').run(chatId, 10);
+
+      const messages = await messagesDB.pollNewMessages();
+
+      expect(messages.length).toBe(1);
+      // For 1:1 chats, sender is the thread_id (the other person's identifier)
+      expect(messages[0].sender).toBe('+15551234567');
+      expect(messages[0].isGroup).toBe(false);
 
       messagesDB.close();
     });
@@ -351,10 +380,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Insert 150 messages
       const appleDate = 694224000000000000;
@@ -375,7 +404,7 @@ describe('MessagesDB', () => {
     });
 
     it('should return empty array on error', async () => {
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Close database to cause error
       messagesDB.close();
@@ -392,10 +421,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
@@ -416,10 +445,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
@@ -444,7 +473,7 @@ describe('MessagesDB', () => {
 
   describe('close', () => {
     it('should close database connection', () => {
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       messagesDB.close();
 
@@ -455,7 +484,7 @@ describe('MessagesDB', () => {
     });
 
     it('should not throw on close', () => {
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       // Close should not throw
       expect(() => {
@@ -469,10 +498,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;user@icloud.com');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'user@icloud.com');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, 'user@icloud.com');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
@@ -492,10 +521,10 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;-;+15551234567');
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, '+15551234567');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(
@@ -515,10 +544,11 @@ describe('MessagesDB', () => {
       const chatId = 1;
       const handleId = 1;
 
-      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'iMessage;+;chat123');
+      // Group chat starts with 'chat'
+      testDb.prepare('INSERT INTO chat (ROWID, chat_identifier) VALUES (?, ?)').run(chatId, 'chat123');
       testDb.prepare('INSERT INTO handle (ROWID, id) VALUES (?, ?)').run(handleId, '+15551234567');
 
-      const messagesDB = new MessagesDB(testDbPath, mockLogger);
+      const messagesDB = new MessagesDB(testDbPath, testAttachmentsDir, mockLogger);
 
       const appleDate = 694224000000000000;
       testDb.prepare('INSERT INTO message (ROWID, text, date, is_from_me, handle_id) VALUES (?, ?, ?, ?, ?)').run(

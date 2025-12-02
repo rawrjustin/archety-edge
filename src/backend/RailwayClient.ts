@@ -95,9 +95,9 @@ export class RailwayClient implements IBackendClient {
    */
   async sendMessage(request: BackendMessageRequest): Promise<BackendMessageResponse> {
     const requestId = `msg_${Date.now()}`;
-    const textPreview = request.filtered_text.substring(0, 50);
+    const textPreview = request.text.substring(0, 50);
 
-    this.logger.info(`[${requestId}] 📤 Sending message to backend from ${request.sender}`);
+    this.logger.info(`[${requestId}] 📤 Sending message to backend from ${request.sender} (${request.mode} chat)`);
     this.logger.debug(`[${requestId}] Text preview: ${textPreview}`);
 
     const maxRetries = 2;

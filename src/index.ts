@@ -7,6 +7,7 @@
 import { loadConfig, validateConfig } from './config';
 import { Config } from './types/config.types';
 import { IncomingMessage } from './types/message.types';
+import { BackendMessageRequest } from './interfaces/IBackendClient';
 import { Logger } from './utils/logger';
 import { AppleScriptTransport } from './transports/AppleScriptTransport';
 import { RailwayClient } from './backend/RailwayClient';
@@ -381,16 +382,18 @@ class EdgeAgent {
 
       // Send to backend for processing
       this.logger.info(`⬆️  SENDING TO BACKEND: ${this.config.backend.url}/edge/message`);
-      const backendRequest = {
-        thread_id: message.threadId,
+      const backendRequest: BackendMessageRequest = {
+        chat_guid: message.threadId,                      // Unique conversation ID
+        mode: message.isGroup ? 'group' : 'direct',       // Conversation mode
         sender: message.sender,
-        filtered_text: filteredText,
-        original_timestamp: message.timestamp.toISOString(),
-        is_group: message.isGroup,
+        text: filteredText,                               // Message text
+        timestamp: Math.floor(message.timestamp.getTime() / 1000), // Unix timestamp
         participants: message.participants,
-        was_redacted: false,
-        redacted_fields: [],
-        filter_reason: 'phase1_transport',
+        metadata: {
+          was_redacted: false,
+          redacted_fields: [],
+          filter_reason: 'phase1_transport'
+        },
         context: this.buildBackendContext(activeContext),
         attachments: attachmentSummaries.length > 0 ? attachmentSummaries : undefined
       };

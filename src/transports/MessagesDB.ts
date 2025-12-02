@@ -97,8 +97,10 @@ export class MessagesDB {
         }
 
         // Determine if group chat
-        // Group chats have multiple participants or have ;-; in the identifier
-        const isGroup = row.thread_id.includes(';-;') || row.thread_id.includes('chat');
+        // Group chats have chat_identifier that starts with "chat" (e.g., "chat655304561542537998")
+        // Direct chats have phone numbers or emails (e.g., "+15551234567" or "user@icloud.com")
+        // Note: The guid column contains ";-;" for direct and ";+;" for group, but we use chat_identifier
+        const isGroup = row.thread_id.startsWith('chat');
 
         // Convert Apple's epoch (2001-01-01) to Unix timestamp
         // Apple's date is in nanoseconds from 2001-01-01 00:00:00 GMT
