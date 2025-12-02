@@ -120,9 +120,11 @@ export class AppleScriptSender {
       let script: string;
 
       if (isGroup) {
-        // For group chats, use chat ID directly
+        // For group chats, use full chat ID format
+        // Messages.app expects "iMessage;+;chatXXX" format, but we receive just "chatXXX" from the database
+        const fullChatId = safeThreadId.startsWith('iMessage;') ? safeThreadId : `iMessage;+;${safeThreadId}`;
         script = `tell application "Messages"
-  set targetChat to first chat whose id is "${safeThreadId}"
+  set targetChat to first chat whose id is "${fullChatId}"
   send "${escapedText}" to targetChat
 end tell`;
       } else {
@@ -248,8 +250,11 @@ EOF`);
       // Build complete AppleScript
       let script: string;
       if (isGroup) {
+        // For group chats, use full chat ID format
+        // Messages.app expects "iMessage;+;chatXXX" format, but we receive just "chatXXX" from the database
+        const fullChatId = safeThreadId.startsWith('iMessage;') ? safeThreadId : `iMessage;+;${safeThreadId}`;
         script = `tell application "Messages"
-    set targetChat to first chat whose id is "${safeThreadId}"
+    set targetChat to first chat whose id is "${fullChatId}"
     ${bubbleCommands}
   end tell`;
       } else {
