@@ -300,15 +300,24 @@ export class WebSocketClient {
 
   /**
    * Send command acknowledgment to backend
-   * Protocol: {"type": "command_ack", "data": {"command_id": "...", "status": "completed|failed|pending", "error": "..."}}
+   * Protocol: {"type": "command_ack", "data": {"command_id": "...", "status": "completed|failed|received|executing", "completed_at": "...", "error": "..."}}
    */
-  sendCommandAck(commandId: string, status: 'completed' | 'failed' | 'pending', error?: string): boolean {
+  sendCommandAck(
+    commandId: string,
+    status: 'completed' | 'failed' | 'received' | 'executing',
+    options?: { error?: string; completedAt?: Date }
+  ): boolean {
+    const completedAt = options?.completedAt ?? (status === 'completed' ? new Date() : undefined);
+
     this.logger.info('-'.repeat(60));
     this.logger.info(`📤 SENDING COMMAND ACK via WebSocket`);
     this.logger.info(`   Command ID: ${commandId}`);
     this.logger.info(`   Status: ${status}`);
-    if (error) {
-      this.logger.info(`   Error: ${error}`);
+    if (completedAt) {
+      this.logger.info(`   Completed At: ${completedAt.toISOString()}`);
+    }
+    if (options?.error) {
+      this.logger.info(`   Error: ${options.error}`);
     }
     this.logger.info('-'.repeat(60));
 
@@ -317,7 +326,8 @@ export class WebSocketClient {
       data: {
         command_id: commandId,
         status,
-        error: error || undefined
+        completed_at: completedAt?.toISOString(),
+        error: options?.error
       }
     });
   }

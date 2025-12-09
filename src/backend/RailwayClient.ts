@@ -239,6 +239,19 @@ export class RailwayClient implements IBackendClient {
       formData.append('context', JSON.stringify(request.context));
     }
 
+    // Group photo handling - pass chat context for deferred processing
+    if (request.chat_guid) {
+      formData.append('chat_guid', request.chat_guid);
+    }
+
+    if (request.is_group !== undefined) {
+      formData.append('is_group', String(request.is_group).toLowerCase());
+    }
+
+    if (request.caption) {
+      formData.append('caption', request.caption);
+    }
+
     // Merge FormData headers with our custom headers
     const uploadHeaders = {
       ...headers,
@@ -251,7 +264,12 @@ export class RailwayClient implements IBackendClient {
       const response = await this.client.post('/photo/upload', formData, {
         headers: uploadHeaders
       });
-      this.logger.info(`[${uploadId}] ✅ Photo upload successful (photo_id=${response.data.photo_id})`);
+      const status = response.data.status || 'processing';
+      if (status === 'stored') {
+        this.logger.info(`[${uploadId}] 📦 Photo stored for deferred processing (photo_id=${response.data.photo_id}, group photo without Sage mention)`);
+      } else {
+        this.logger.info(`[${uploadId}] ✅ Photo upload successful (photo_id=${response.data.photo_id}, status=${status})`);
+      }
       return response.data;
     } catch (error: any) {
       this.logger.error(`[${uploadId}] ❌ Photo upload failed`);

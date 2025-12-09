@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { ILogger } from '../interfaces/ILogger';
 import { IMessageTransport } from '../interfaces/IMessageTransport';
+import { AmplitudeAnalytics } from '../monitoring/amplitude';
 
 /**
  * Scheduled message interface
@@ -19,6 +20,16 @@ export interface ScheduledMessage {
 }
 
 /**
+ * Callback for acknowledging scheduled message execution to backend
+ * Called when a scheduled message (from a command) is sent or fails
+ */
+export type SchedulerAckCallback = (
+  commandId: string,
+  status: 'completed' | 'failed',
+  options?: { error?: string; completedAt?: Date }
+) => void;
+
+/**
  * Scheduler - Local message scheduling and execution
  * Stores scheduled messages in SQLite and executes them at the right time
  */
@@ -26,25 +37,37 @@ export class Scheduler {
   private db: Database.Database;
   private logger: ILogger;
   private transport: IMessageTransport;
+  private amplitude: AmplitudeAnalytics | null = null;
   private checkInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private adaptiveMode: boolean = true; // Phase 3: Adaptive scheduling
   private maxCheckIntervalMs: number = 60000; // Max 60s between checks
   private checkBufferMs: number = 100; // Check 100ms before message is due
+  private ackCallback: SchedulerAckCallback | null = null;
 
   constructor(
     dbPath: string,
     transport: IMessageTransport,
-    logger: ILogger
+    logger: ILogger,
+    amplitude?: AmplitudeAnalytics
   ) {
     this.logger = logger;
     this.transport = transport;
+    this.amplitude = amplitude || null;
 
     // Initialize database
     this.db = new Database(dbPath);
     this.initDatabase();
 
     this.logger.info('Scheduler initialized');
+  }
+
+  /**
+   * Set callback for acknowledging scheduled message execution to backend
+   * This is called when a scheduled message (from a command) is sent or fails
+   */
+  onAck(callback: SchedulerAckCallback): void {
+    this.ackCallback = callback;
   }
 
   /**
@@ -103,6 +126,11 @@ export class Scheduler {
     );
 
     this.logger.info(`Scheduled message ${id} for ${sendAt.toISOString()}`);
+
+    // Track scheduled message
+    if (this.amplitude) {
+      this.amplitude.trackScheduledMessage(sendAt.toISOString(), true);
+    }
 
     // Reschedule next check if in adaptive mode and scheduler is running
     // This ensures newly added messages don't wait for the current timeout
@@ -397,6 +425,10 @@ export class Scheduler {
    * Execute a scheduled message (already atomically claimed as 'sent')
    */
   private async executeSendMessage(message: ScheduledMessage): Promise<void> {
+    const actualTime = new Date();
+    const scheduledTime = new Date(message.send_at);
+    const latencyMs = actualTime.getTime() - scheduledTime.getTime();
+
     try {
       this.logger.info('='.repeat(60));
       this.logger.info(`🔔 SENDING SCHEDULED MESSAGE`);
@@ -416,8 +448,25 @@ export class Scheduler {
         message.is_group
       );
 
+      // Track scheduled message execution
+      if (this.amplitude) {
+        this.amplitude.trackScheduledMessageExecuted(
+          parseInt(message.id.replace(/-/g, '').substring(0, 8), 16), // Simple numeric ID from UUID
+          scheduledTime.toISOString(),
+          actualTime.toISOString(),
+          latencyMs,
+          success
+        );
+      }
+
       if (success) {
         this.logger.info(`✅ Scheduled message ${message.id} sent successfully`);
+
+        // Send command acknowledgment to backend (prevents duplicate sends from safety net)
+        if (message.command_id && this.ackCallback) {
+          this.logger.info(`📤 Sending command_ack for ${message.command_id} (status: completed)`);
+          this.ackCallback(message.command_id, 'completed', { completedAt: actualTime });
+        }
       } else {
         // Mark as failed (even though we claimed it as 'sent' earlier)
         const updateStmt = this.db.prepare(`
@@ -428,8 +477,28 @@ export class Scheduler {
         updateStmt.run('Failed to send via transport', message.id);
 
         this.logger.error(`❌ Failed to send scheduled message ${message.id}`);
+
+        // Send failure acknowledgment to backend
+        if (message.command_id && this.ackCallback) {
+          this.logger.info(`📤 Sending command_ack for ${message.command_id} (status: failed)`);
+          this.ackCallback(message.command_id, 'failed', {
+            error: 'iMessage send failed: transport returned false',
+            completedAt: actualTime
+          });
+        }
       }
     } catch (error: any) {
+      // Track failed execution
+      if (this.amplitude) {
+        this.amplitude.trackScheduledMessageExecuted(
+          parseInt(message.id.replace(/-/g, '').substring(0, 8), 16),
+          scheduledTime.toISOString(),
+          actualTime.toISOString(),
+          latencyMs,
+          false
+        );
+      }
+
       // Mark as failed with error
       const updateStmt = this.db.prepare(`
         UPDATE scheduled_messages
@@ -439,6 +508,15 @@ export class Scheduler {
       updateStmt.run(error.message, message.id);
 
       this.logger.error(`Error executing scheduled message ${message.id}:`, error.message);
+
+      // Send failure acknowledgment to backend
+      if (message.command_id && this.ackCallback) {
+        this.logger.info(`📤 Sending command_ack for ${message.command_id} (status: failed)`);
+        this.ackCallback(message.command_id, 'failed', {
+          error: `iMessage send failed: ${error.message}`,
+          completedAt: actualTime
+        });
+      }
     }
   }
 

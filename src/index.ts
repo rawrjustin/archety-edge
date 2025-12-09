@@ -112,7 +112,12 @@ class EdgeAgent {
 
     // Initialize scheduler
     const dbPath = this.config.database?.path || './data/scheduler.db';
-    this.scheduler = new Scheduler(dbPath, this.transport, this.logger);
+    this.scheduler = new Scheduler(dbPath, this.transport, this.logger, this.amplitude);
+
+    // Set up scheduler acknowledgment callback for scheduled message execution
+    this.scheduler.onAck((commandId, status, options) => {
+      this.sendScheduledMessageAck(commandId, status, options);
+    });
 
     // Initialize rule engine
     const rulesDbPath = this.config.database?.rules_path || './data/rules.db';
@@ -158,6 +163,10 @@ class EdgeAgent {
     this.wsClient.onConnected(() => {
       this.logger.info('🔌 WebSocket connected - real-time command delivery enabled');
       this.healthCheck.setWebSocketConnected(true);
+
+      // Track WebSocket connection
+      this.amplitude.trackWebSocketStatus('connected');
+
       // Reduce or stop HTTP polling when WebSocket is connected
       if (this.syncInterval) {
         clearInterval(this.syncInterval);
@@ -169,6 +178,10 @@ class EdgeAgent {
     this.wsClient.onDisconnected(() => {
       this.logger.warn('🔌 WebSocket disconnected - falling back to HTTP polling');
       this.healthCheck.setWebSocketConnected(false);
+
+      // Track WebSocket disconnection
+      this.amplitude.trackWebSocketStatus('disconnected');
+
       // Resume HTTP polling as fallback
       if (!this.syncInterval && this.isRunning) {
         this.startSyncLoop();
@@ -283,6 +296,8 @@ class EdgeAgent {
           this.logger.info('✅ WebSocket connected - real-time mode enabled');
         } else {
           this.logger.warn('⚠️  WebSocket connection failed - falling back to HTTP polling');
+          // Track WebSocket connection failure
+          this.amplitude.trackWebSocketStatus('failed', 'Initial connection failed');
           this.startSyncLoop();
         }
       } else {
@@ -362,6 +377,13 @@ class EdgeAgent {
       this.logger.info(`   Text: "${message.text}"`);
       this.logger.info('='.repeat(60));
 
+      // Track message received
+      this.amplitude.trackMessageReceived(
+        message.threadId,
+        message.isGroup,
+        (message.attachments?.length ?? 0) > 0
+      );
+
       // Filter out messages from the edge client's own phone number to prevent loops
       if (message.sender === this.config.edge.user_phone) {
         this.logger.info(`⏭️  Skipping message from edge client's own number (${message.sender}) to prevent loop`);
@@ -428,6 +450,14 @@ class EdgeAgent {
             message.isGroup
           );
 
+          // Track reflex message sent
+          this.amplitude.trackMessageSent(
+            message.threadId,
+            message.isGroup,
+            'reflex',
+            reflexSent
+          );
+
           if (reflexSent) {
             this.logger.info('✅ Reflex message DELIVERED to iMessage');
           } else {
@@ -454,6 +484,14 @@ class EdgeAgent {
                 message.isGroup
               );
 
+              // Track burst messages sent
+              this.amplitude.trackMessageSent(
+                message.threadId,
+                message.isGroup,
+                'burst',
+                burstSent
+              );
+
               if (burstSent) {
                 this.logger.info('✅ All burst messages DELIVERED to iMessage');
               } else {
@@ -477,6 +515,14 @@ class EdgeAgent {
             message.isGroup
           );
 
+          // Track multi-bubble message sent
+          this.amplitude.trackMessageSent(
+            message.threadId,
+            message.isGroup,
+            'multi',
+            sent
+          );
+
           if (sent) {
             this.logger.info('✅ All bubbles DELIVERED to iMessage');
           } else {
@@ -496,6 +542,14 @@ class EdgeAgent {
             message.isGroup
           );
 
+          // Track single message sent
+          this.amplitude.trackMessageSent(
+            message.threadId,
+            message.isGroup,
+            'single',
+            sent
+          );
+
           if (sent) {
             this.logger.info('✅ Response DELIVERED to iMessage');
           } else {
@@ -507,6 +561,17 @@ class EdgeAgent {
       }
     } catch (error: any) {
       this.logger.error('Error processing message:', error.message);
+
+      // Track error
+      this.amplitude.trackError(
+        'message_processing',
+        error.message,
+        {
+          thread_id: message.threadId,
+          is_group: message.isGroup,
+          component: 'EdgeAgent.processMessage'
+        }
+      );
     }
   }
 
@@ -585,6 +650,7 @@ class EdgeAgent {
    * Process a command from the backend
    */
   private async processCommand(command: EdgeCommandWrapper): Promise<void> {
+    const commandStartTime = Date.now();
     try {
       // Log command priority if specified
       if (command.priority === 'immediate') {
@@ -594,12 +660,20 @@ class EdgeAgent {
       if (command.command_type === 'upload_retry') {
         const retryResult = await this.handleUploadRetryCommand(command);
         await this.acknowledgeCommandResult(command, retryResult.success, retryResult.error);
+
+        // Track command execution
+        const durationMs = Date.now() - commandStartTime;
+        this.amplitude.trackCommandProcessed(command.command_type, retryResult.success, durationMs);
         return;
       }
 
       if (command.command_type === 'emit_event') {
         const eventResult = await this.handleEmitEventCommand(command);
         await this.acknowledgeCommandResult(command, eventResult.success, eventResult.error);
+
+        // Track command execution
+        const durationMs = Date.now() - commandStartTime;
+        this.amplitude.trackCommandProcessed(command.command_type, eventResult.success, durationMs);
         return;
       }
 
@@ -611,6 +685,10 @@ class EdgeAgent {
 
       await this.acknowledgeCommandResult(command, result.success, result.error);
 
+      // Track command execution
+      const durationMs = Date.now() - commandStartTime;
+      this.amplitude.trackCommandProcessed(command.command_type, result.success, durationMs);
+
       if (result.success) {
         this.logger.info(`✅ Command ${command.command_id} executed successfully`);
       } else {
@@ -619,6 +697,19 @@ class EdgeAgent {
     } catch (error: any) {
       this.logger.error(`Error processing command ${command.command_id}:`, error.message);
       await this.acknowledgeCommandResult(command, false, error.message);
+
+      // Track command error
+      const durationMs = Date.now() - commandStartTime;
+      this.amplitude.trackCommandProcessed(command.command_type, false, durationMs);
+      this.amplitude.trackError(
+        'command_processing',
+        error.message,
+        {
+          command_type: command.command_type,
+          command_id: command.command_id,
+          component: 'EdgeAgent.processCommand'
+        }
+      );
     }
   }
 
@@ -631,7 +722,7 @@ class EdgeAgent {
       ? this.wsClient.sendCommandAck(
           command.command_id,
           success ? 'completed' : 'failed',
-          error
+          { error }
         )
       : false;
 
@@ -641,6 +732,32 @@ class EdgeAgent {
         success,
         error
       );
+    }
+  }
+
+  /**
+   * Send acknowledgment for scheduled message execution
+   * Called by Scheduler when a scheduled message (from a command) is sent or fails
+   * This prevents the backend safety net from sending duplicate reminders
+   */
+  private sendScheduledMessageAck(
+    commandId: string,
+    status: 'completed' | 'failed',
+    options?: { error?: string; completedAt?: Date }
+  ): void {
+    const ackSent = this.wsClient.isConnected()
+      ? this.wsClient.sendCommandAck(commandId, status, options)
+      : false;
+
+    if (!ackSent) {
+      // Fall back to HTTP acknowledgment
+      this.backend.acknowledgeCommand(
+        commandId,
+        status === 'completed',
+        options?.error
+      ).catch(err => {
+        this.logger.error(`Failed to send HTTP ack for scheduled message ${commandId}:`, err.message);
+      });
     }
   }
 
@@ -741,7 +858,20 @@ class EdgeAgent {
       }
 
       if (!item.skipped && item.base64) {
+        const uploadStartTime = Date.now();
+
+        // Track photo upload started
+        this.amplitude.trackPhotoUploadStarted(
+          item.attachment.guid,
+          item.mimeType || 'unknown',
+          item.sizeBytes ?? 0,
+          message.threadId
+        );
+
         try {
+          // Extract caption from message text (if photo has accompanying text)
+          const caption = message.text?.trim() || undefined;
+
           const uploadResponse = await this.backend.uploadPhoto({
             photo_data: item.base64,
             user_phone: message.sender,
@@ -750,13 +880,41 @@ class EdgeAgent {
             mime_type: item.mimeType,
             size_bytes: item.sizeBytes ?? undefined,
             attachment_guid: item.attachment.guid,
-            context: backendContext
+            context: backendContext,
+            // Group photo handling - backend will defer processing if group without Sage mention
+            is_group: message.isGroup,
+            caption
           });
+
+          const uploadDurationMs = Date.now() - uploadStartTime;
+
+          // Track photo upload completed
+          this.amplitude.trackPhotoUploadCompleted(
+            item.attachment.guid,
+            uploadResponse.photo_id,
+            item.sizeBytes ?? 0,
+            uploadDurationMs,
+            false // transcoded flag - would need to track from AttachmentProcessor
+          );
 
           summary.uploaded_photo_id = uploadResponse.photo_id;
           this.attachmentCache.markUploaded(item.attachment.guid, uploadResponse.photo_id);
-          this.logger.info(`📸 Uploaded attachment ${item.attachment.guid} (photo_id=${uploadResponse.photo_id})`);
+
+          // Log based on processing status
+          const status = uploadResponse.status || 'processing';
+          if (status === 'stored') {
+            this.logger.info(`📦 Photo ${item.attachment.guid} stored for deferred processing (group chat, no Sage mention)`);
+          } else {
+            this.logger.info(`📸 Uploaded attachment ${item.attachment.guid} (photo_id=${uploadResponse.photo_id})`);
+          }
         } catch (error: any) {
+          // Track photo upload failed
+          this.amplitude.trackPhotoUploadFailed(
+            item.attachment.guid,
+            error.message,
+            item.sizeBytes ?? 0
+          );
+
           summary.skipped = true;
           summary.skip_reason = 'upload_failed';
           this.logger.error(`❌ Failed to upload attachment ${item.attachment.guid}: ${error.message}`);
@@ -822,7 +980,10 @@ class EdgeAgent {
         mime_type: item.mimeType,
         size_bytes: item.sizeBytes ?? undefined,
         attachment_guid: record.guid,
-        context: backendContext
+        context: backendContext,
+        // Group photo handling - include cached group context
+        is_group: record.isGroup
+        // Note: caption not available for retry - backend should handle without it
       });
 
       this.attachmentCache.markUploaded(record.guid, uploadResponse.photo_id);

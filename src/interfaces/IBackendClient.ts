@@ -71,6 +71,9 @@ export interface PhotoUploadRequest {
   size_bytes?: number;
   attachment_guid?: string;
   context?: BackendMiniAppContext;
+  // Group photo handling
+  is_group?: boolean;           // Whether this photo is from a group chat
+  caption?: string;             // Photo caption text (backend checks for Sage mentions)
 }
 
 export interface PhotoUploadResponse {
@@ -79,6 +82,8 @@ export interface PhotoUploadResponse {
   analysis?: Record<string, any>;
   action?: string | null;
   event?: Record<string, any>;
+  // Group photo handling - indicates processing state
+  status?: 'processing' | 'stored';  // 'processing' = being analyzed, 'stored' = deferred (group, no mention)
 }
 
 export interface IBackendClient {
