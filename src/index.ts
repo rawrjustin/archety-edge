@@ -411,6 +411,7 @@ class EdgeAgent {
         text: filteredText,                               // Message text
         timestamp: Math.floor(message.timestamp.getTime() / 1000), // Unix timestamp
         participants: message.participants,
+        persona_id: 'sage',                               // Sage persona for this edge node
         metadata: {
           was_redacted: false,
           redacted_fields: [],

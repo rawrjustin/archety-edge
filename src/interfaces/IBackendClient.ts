@@ -12,6 +12,7 @@ export interface BackendMessageRequest {
   text: string;                // Message text
   timestamp: number;           // Unix timestamp
   participants: string[];      // All participants in conversation
+  persona_id: string;          // Persona to respond (e.g., "sage", "vex")
   metadata?: {                 // Optional metadata
     is_first_message?: boolean;
     mentioned_sage?: boolean;
