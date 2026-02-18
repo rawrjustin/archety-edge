@@ -14,6 +14,16 @@ import { RuleEngine, Rule } from '../rules/RuleEngine';
 import { PlanManager } from '../plans/PlanManager';
 import { IMessageTransport } from '../interfaces/IMessageTransport';
 import { ContextManager } from '../context/ContextManager';
+import {
+  validateThreadId,
+  validateMessageText,
+  validateTimestamp,
+  validateScheduleId,
+  validateAppId,
+  validateBoolean,
+  validateObjectDepth,
+  validateJsonSize
+} from '../utils/validation';
 
 /**
  * CommandHandler - Processes commands from backend
@@ -97,7 +107,7 @@ export class CommandHandler {
     const payload = command.payload as SendMessageNowCommand['payload'];
 
     try {
-      // Validate payload
+      // Validate required fields
       if (!payload.thread_id || !payload.text) {
         return {
           success: false,
@@ -105,22 +115,37 @@ export class CommandHandler {
         };
       }
 
+      // Validate thread_id
+      const threadIdValidation = validateThreadId(payload.thread_id);
+      if (!threadIdValidation.valid) {
+        return { success: false, error: `Invalid thread_id: ${threadIdValidation.error}` };
+      }
+
+      // Validate and sanitize message text
+      const textValidation = validateMessageText(payload.text, 10000);
+      if (!textValidation.valid) {
+        return { success: false, error: `Invalid text: ${textValidation.error}` };
+      }
+
+      const sanitizedThreadId = threadIdValidation.sanitized!;
+      const sanitizedText = textValidation.sanitized!;
+
       // Parse thread_id to determine if it's a group chat
-      const isGroup = payload.thread_id.includes('chat');
+      const isGroup = sanitizedThreadId.includes('chat');
 
       // Log the immediate send
       const bubbleType = payload.bubble_type || 'normal';
       this.logger.info('='.repeat(60));
       this.logger.info(`⚡ SENDING ${bubbleType.toUpperCase()} MESSAGE IMMEDIATELY via WebSocket`);
-      this.logger.info(`   Thread: ${payload.thread_id}`);
-      this.logger.info(`   Text: "${payload.text}"`);
+      this.logger.info(`   Thread: ${sanitizedThreadId}`);
+      this.logger.info(`   Text: "${sanitizedText.substring(0, 100)}${sanitizedText.length > 100 ? '...' : ''}"`); // Truncate long text in logs
       this.logger.info(`   Type: ${bubbleType}`);
       this.logger.info('='.repeat(60));
 
       // Send immediately via transport
       const sent = await this.transport.sendMessage(
-        payload.thread_id,
-        payload.text,
+        sanitizedThreadId,
+        sanitizedText,
         isGroup
       );
 
@@ -150,20 +175,48 @@ export class CommandHandler {
     const payload = command.payload as ScheduleMessageCommand['payload'];
 
     try {
-      const sendAt = new Date(payload.send_at);
-
-      // Validate timestamp
-      if (isNaN(sendAt.getTime())) {
+      // Validate required fields
+      if (!payload.thread_id || !payload.message_text || !payload.send_at) {
         return {
           success: false,
-          error: `Invalid timestamp: ${payload.send_at}`
+          error: 'Missing required fields: thread_id, message_text, and send_at'
         };
       }
 
+      // Validate thread_id
+      const threadIdValidation = validateThreadId(payload.thread_id);
+      if (!threadIdValidation.valid) {
+        return { success: false, error: `Invalid thread_id: ${threadIdValidation.error}` };
+      }
+
+      // Validate message text
+      const textValidation = validateMessageText(payload.message_text, 10000);
+      if (!textValidation.valid) {
+        return { success: false, error: `Invalid message_text: ${textValidation.error}` };
+      }
+
+      // Validate timestamp
+      const timestampValidation = validateTimestamp(payload.send_at);
+      if (!timestampValidation.valid) {
+        return { success: false, error: `Invalid send_at: ${timestampValidation.error}` };
+      }
+
+      // Validate is_group if provided
+      if (payload.is_group !== undefined) {
+        const isGroupValidation = validateBoolean(payload.is_group, 'is_group');
+        if (!isGroupValidation.valid) {
+          return { success: false, error: isGroupValidation.error };
+        }
+      }
+
+      const sanitizedThreadId = threadIdValidation.sanitized!;
+      const sanitizedText = textValidation.sanitized!;
+      const sendAt = new Date(timestampValidation.sanitized!);
+
       // Schedule the message
       const scheduleId = this.scheduler.scheduleMessage(
-        payload.thread_id,
-        payload.message_text,
+        sanitizedThreadId,
+        sanitizedText,
         sendAt,
         payload.is_group || false,
         command.command_id
@@ -198,7 +251,17 @@ export class CommandHandler {
     const payload = command.payload as CancelScheduledCommand['payload'];
 
     try {
-      const cancelled = this.scheduler.cancelMessage(payload.schedule_id);
+      // Validate schedule_id
+      if (!payload.schedule_id) {
+        return { success: false, error: 'Missing required field: schedule_id' };
+      }
+
+      const scheduleIdValidation = validateScheduleId(payload.schedule_id);
+      if (!scheduleIdValidation.valid) {
+        return { success: false, error: `Invalid schedule_id: ${scheduleIdValidation.error}` };
+      }
+
+      const cancelled = this.scheduler.cancelMessage(scheduleIdValidation.sanitized!);
 
       if (cancelled) {
         this.logger.info(`Cancelled scheduled message ${payload.schedule_id}`);
@@ -340,21 +403,67 @@ export class CommandHandler {
     }
 
     const payload = command.payload as ContextUpdateCommand['payload'];
+
+    // Validate required fields
     if (!payload.chat_guid || !payload.app_id || !payload.thread_id) {
       return { success: false, error: 'chat_guid, app_id, and thread_id are required' };
     }
 
+    // Validate thread_id
+    const threadIdValidation = validateThreadId(payload.thread_id);
+    if (!threadIdValidation.valid) {
+      return { success: false, error: `Invalid thread_id: ${threadIdValidation.error}` };
+    }
+
+    // Validate chat_guid (same format as thread_id)
+    const chatGuidValidation = validateThreadId(payload.chat_guid);
+    if (!chatGuidValidation.valid) {
+      return { success: false, error: `Invalid chat_guid: ${chatGuidValidation.error}` };
+    }
+
+    // Validate app_id
+    const appIdValidation = validateAppId(payload.app_id);
+    if (!appIdValidation.valid) {
+      return { success: false, error: `Invalid app_id: ${appIdValidation.error}` };
+    }
+
+    // Validate metadata if provided (check depth and size)
+    if (payload.metadata) {
+      const depthValidation = validateObjectDepth(payload.metadata, 10);
+      if (!depthValidation.valid) {
+        return { success: false, error: `Invalid metadata: ${depthValidation.error}` };
+      }
+
+      const sizeValidation = validateJsonSize(payload.metadata, 100 * 1024); // 100KB max
+      if (!sizeValidation.valid) {
+        return { success: false, error: `Invalid metadata: ${sizeValidation.error}` };
+      }
+    }
+
+    // Validate notify_text if provided
+    if (payload.notify_text) {
+      const notifyTextValidation = validateMessageText(payload.notify_text, 5000);
+      if (!notifyTextValidation.valid) {
+        return { success: false, error: `Invalid notify_text: ${notifyTextValidation.error}` };
+      }
+    }
+
     this.contextManager.upsertContext({
-      chatGuid: payload.chat_guid,
-      appId: payload.app_id,
+      chatGuid: chatGuidValidation.sanitized!,
+      appId: appIdValidation.sanitized!,
       roomId: payload.room_id,
       state: payload.state || 'active',
       metadata: payload.metadata
     });
 
     if (payload.notify_text) {
-      const isGroup = payload.thread_id.includes('chat');
-      await this.transport.sendMessage(payload.thread_id, payload.notify_text, isGroup);
+      const textValidation = validateMessageText(payload.notify_text, 5000);
+      const isGroup = threadIdValidation.sanitized!.includes('chat');
+      await this.transport.sendMessage(
+        threadIdValidation.sanitized!,
+        textValidation.sanitized!,
+        isGroup
+      );
     }
 
     return { success: true };
@@ -371,15 +480,42 @@ export class CommandHandler {
     }
 
     const payload = command.payload as ContextResetCommand['payload'];
+
+    // Validate required fields
     if (!payload.chat_guid || !payload.thread_id) {
       return { success: false, error: 'chat_guid and thread_id are required' };
     }
 
-    this.contextManager.clearContext(payload.chat_guid);
+    // Validate thread_id
+    const threadIdValidation = validateThreadId(payload.thread_id);
+    if (!threadIdValidation.valid) {
+      return { success: false, error: `Invalid thread_id: ${threadIdValidation.error}` };
+    }
+
+    // Validate chat_guid
+    const chatGuidValidation = validateThreadId(payload.chat_guid);
+    if (!chatGuidValidation.valid) {
+      return { success: false, error: `Invalid chat_guid: ${chatGuidValidation.error}` };
+    }
+
+    // Validate notify_text if provided
+    if (payload.notify_text) {
+      const notifyTextValidation = validateMessageText(payload.notify_text, 5000);
+      if (!notifyTextValidation.valid) {
+        return { success: false, error: `Invalid notify_text: ${notifyTextValidation.error}` };
+      }
+    }
+
+    this.contextManager.clearContext(chatGuidValidation.sanitized!);
 
     if (payload.notify_text) {
-      const isGroup = payload.thread_id.includes('chat');
-      await this.transport.sendMessage(payload.thread_id, payload.notify_text, isGroup);
+      const textValidation = validateMessageText(payload.notify_text, 5000);
+      const isGroup = threadIdValidation.sanitized!.includes('chat');
+      await this.transport.sendMessage(
+        threadIdValidation.sanitized!,
+        textValidation.sanitized!,
+        isGroup
+      );
     }
 
     return { success: true };

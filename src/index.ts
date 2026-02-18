@@ -471,7 +471,8 @@ class EdgeAgent {
             this.logger.info(`⏳ Will send ${response.burst_messages.length} burst messages after ${delayMs}ms`);
             this.logger.info(`   Burst messages: ${JSON.stringify(response.burst_messages)}`);
 
-            setTimeout(async () => {
+            // MEMORY LEAK FIX: Use safeSetTimeout to track timer for cleanup
+            this.safeSetTimeout(async () => {
               this.logger.info('-'.repeat(60));
               this.logger.info(`📤 SENDING BURST MESSAGES to ${message.threadId}`);
               for (let i = 0; i < response.burst_messages!.length; i++) {
