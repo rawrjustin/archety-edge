@@ -6,6 +6,31 @@
 
 ---
 
+## Quick Setup (Automated)
+
+Use `setup-persona.sh` to provision a new persona in one command:
+
+```bash
+sudo ./setup-persona.sh \
+  --persona-id vex \
+  --phone "+14155559876" \
+  --edge-secret "your_shared_secret"
+```
+
+This automates: macOS user creation, repo clone, dependency install, build, config generation, port assignment, and LaunchDaemon installation. See the script's `--help` for all options.
+
+**Management scripts:**
+
+| Script | Purpose |
+|--------|---------|
+| `setup-persona.sh` | Provision a new persona (one command) |
+| `teardown-persona.sh` | Remove a persona (`--delete-user` to also remove macOS account) |
+| `list-personas.sh` | Show all personas with health status |
+
+After running `setup-persona.sh`, follow the printed manual checklist (Fast User Switching login, iMessage sign-in, macOS permissions). The sections below document each step in detail for reference and troubleshooting.
+
+---
+
 ## Prerequisites
 
 - Mac mini M4 16GB (or M2 16GB) running macOS Sequoia 15+
