@@ -7,6 +7,7 @@ Complete documentation for the Edge Relay iMessage agent.
 **Getting Started:**
 - [Quick Start Guide](setup/GETTING_STARTED.md) - Set up in 15 minutes
 - [Auto-Start Guide](setup/AUTO_START.md) - Run as system service
+- [Multi-Persona Setup](setup/MULTI_PERSONA_EDGE_SETUP.md) - Run 4-6 personas on one Mac mini
 - [Configuration Guide](setup/CONFIGURATION.md) - Performance tuning
 - [Troubleshooting](setup/TROUBLESHOOTING.md) - Common issues
 
@@ -28,6 +29,7 @@ docs/
 ├── setup/                    # Setup and configuration
 │   ├── GETTING_STARTED.md   # Quick setup guide
 │   ├── AUTO_START.md         # Auto-start on boot
+│   ├── MULTI_PERSONA_EDGE_SETUP.md  # Multi-persona provisioning
 │   ├── CONFIGURATION.md      # Config options and tuning
 │   └── TROUBLESHOOTING.md    # Common issues and solutions
 │
@@ -45,6 +47,9 @@ docs/
 
 ### I want it to auto-start on boot
 → [Auto-Start Guide](setup/AUTO_START.md)
+
+### I want to run multiple personas on one Mac mini
+→ [Multi-Persona Setup](setup/MULTI_PERSONA_EDGE_SETUP.md)
 
 ### I need to configure it
 → [Configuration Guide](setup/CONFIGURATION.md)

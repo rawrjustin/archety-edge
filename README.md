@@ -111,6 +111,29 @@ npm run service:uninstall
 
 **See [Auto-Start Guide](docs/setup/AUTO_START.md) for details.**
 
+### Multi-Persona Setup
+
+Run multiple personas (Sage, Vex, Echo, Kael, etc.) on a single Mac mini, each with its own phone number:
+
+```bash
+# Provision a new persona in one command
+sudo ./setup-persona.sh \
+  --persona-id vex \
+  --phone "+14155559876" \
+  --edge-secret "your_shared_secret"
+
+# View all provisioned personas and their status
+./list-personas.sh
+
+# Remove a persona
+sudo ./teardown-persona.sh --persona-id vex
+sudo ./teardown-persona.sh --persona-id vex --delete-user  # also remove macOS account
+```
+
+`setup-persona.sh` automates: macOS user creation, repo clone, dependency install, native helper build, `config.yaml` and `.env` generation with auto-assigned unique ports, and LaunchDaemon installation. After running it, follow the printed checklist for manual steps (Fast User Switching login, iMessage sign-in, macOS permissions).
+
+**See [Multi-Persona Setup Guide](docs/setup/MULTI_PERSONA_EDGE_SETUP.md) for architecture details and validation steps.**
+
 ## Performance
 
 The edge relay includes extensive performance optimizations:
@@ -159,6 +182,7 @@ iMessage ↔ MessagesDB ↔ EdgeAgent ↔ Backend (HTTPS)
 
 ### Setup
 - [Getting Started](docs/setup/GETTING_STARTED.md) - Quick 15-minute setup
+- [Multi-Persona Setup](docs/setup/MULTI_PERSONA_EDGE_SETUP.md) - Run multiple personas on one Mac
 - [Configuration Guide](docs/setup/CONFIGURATION.md) - Performance tuning
 - [Troubleshooting](docs/setup/TROUBLESHOOTING.md) - Common issues
 
@@ -185,7 +209,10 @@ edge-relay/
 ├── __tests__/                # Unit tests
 ├── config.yaml               # Runtime configuration
 ├── .env                      # Secrets (not in git)
-├── edge-agent.sh             # Management script
+├── edge-agent.sh             # Single-agent management script
+├── setup-persona.sh          # Provision a new persona (multi-agent)
+├── teardown-persona.sh       # Remove a persona
+├── list-personas.sh          # Show all personas and status
 └── package.json              # Dependencies
 ```
 
