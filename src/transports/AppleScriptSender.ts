@@ -93,16 +93,18 @@ export class AppleScriptSender {
    */
   async sendMessage(threadId: string, text: string, isGroup: boolean): Promise<boolean> {
     try {
-      // Check rate limit: max 60 messages per minute
+      // Check rate limit: max 120 messages per minute
+      // Conservative vs Apple's undocumented iMessage limits.
+      // Safe for existing conversations; Apple may soft-throttle at ~200/hr to new contacts.
       const allowed = await this.rateLimiter.checkLimit({
-        maxRequests: 60,
+        maxRequests: 120,
         windowMs: 60000,
         identifier: 'send_message'
       });
 
       if (!allowed) {
         this.logger.error('❌ Rate limit exceeded for message sending');
-        throw new Error('Rate limit exceeded: max 60 messages/minute');
+        throw new Error('Rate limit exceeded: max 120 messages/minute');
       }
 
       // Validate message length

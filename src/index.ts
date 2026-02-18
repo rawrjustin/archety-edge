@@ -34,6 +34,7 @@ import { BackendAttachmentSummary, BackendMiniAppContext } from './interfaces/IB
 import { KeychainManager } from './utils/keychain';
 import { IMessageTransport, MessageAttachment } from './interfaces/IMessageTransport';
 import { NativeBridgeTransport } from './transports/NativeBridgeTransport';
+import { SendQueue } from './transports/SendQueue';
 
 /**
  * Main application class
@@ -55,6 +56,7 @@ class EdgeAgent {
   private attachmentCache: AttachmentCache;
   private attachmentProcessor: AttachmentProcessor;
   private photoTranscoder: PhotoTranscoder;
+  private sendQueue: SendQueue;
   private pollInterval: NodeJS.Timeout | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
@@ -89,6 +91,13 @@ class EdgeAgent {
 
     // Initialize transport
     this.transport = this.initializeTransport(attachmentsPath);
+
+    // Initialize send queue — buffers outbound messages with retry on rate-limit
+    this.sendQueue = new SendQueue(
+      (threadId, text, isGroup) => this.transport.sendMessage(threadId, text, isGroup),
+      (threadId, bubbles, isGroup, batched) => this.transport.sendMultiBubble(threadId, bubbles, isGroup, batched),
+      this.logger
+    );
 
     // Initialize backend client and WebSocket (both use EDGE_SECRET for auth)
     const edgeSecret = process.env.EDGE_SECRET;
@@ -282,6 +291,9 @@ class EdgeAgent {
         this.logger.warn('⚠️  Backend health check failed');
       }
 
+      // Start send queue
+      this.sendQueue.start();
+
       // Start message polling loop
       this.isRunning = true;
 
@@ -465,97 +477,56 @@ class EdgeAgent {
             this.logger.error('❌ FAILED to deliver reflex message to iMessage');
           }
 
-          // Send burst messages after delay (if any)
+          // Enqueue burst messages after delay (if any)
           if (response.burst_messages && response.burst_messages.length > 0) {
             const delayMs = response.burst_delay_ms || 2000;
-            this.logger.info(`⏳ Will send ${response.burst_messages.length} burst messages after ${delayMs}ms`);
-            this.logger.info(`   Burst messages: ${JSON.stringify(response.burst_messages)}`);
+            this.logger.info(`⏳ Will enqueue ${response.burst_messages.length} burst messages after ${delayMs}ms`);
 
-            setTimeout(async () => {
-              this.logger.info('-'.repeat(60));
-              this.logger.info(`📤 SENDING BURST MESSAGES to ${message.threadId}`);
-              for (let i = 0; i < response.burst_messages!.length; i++) {
-                this.logger.info(`   [${i + 1}/${response.burst_messages!.length}]: "${response.burst_messages![i]}"`);
-              }
-              this.logger.info('-'.repeat(60));
+            const burstMessages = response.burst_messages;
+            const threadId = message.threadId;
+            const isGroup = message.isGroup;
 
-              const burstSent = await this.transport.sendMultiBubble(
-                message.threadId,
-                response.burst_messages!,
-                message.isGroup
+            setTimeout(() => {
+              this.logger.info(`📤 Enqueuing burst messages for ${threadId}`);
+              this.sendQueue.enqueueMultiBubble(
+                threadId,
+                burstMessages,
+                isGroup,
+                true,
+                () => {
+                  this.amplitude.trackMessageSent(threadId, isGroup, 'burst', true);
+                  this.logger.info('✅ All burst messages DELIVERED to iMessage');
+                }
               );
-
-              // Track burst messages sent
-              this.amplitude.trackMessageSent(
-                message.threadId,
-                message.isGroup,
-                'burst',
-                burstSent
-              );
-
-              if (burstSent) {
-                this.logger.info('✅ All burst messages DELIVERED to iMessage');
-              } else {
-                this.logger.error('❌ FAILED to deliver burst messages to iMessage');
-              }
             }, delayMs);
           }
         }
-        // Legacy multi-bubble response
+        // Legacy multi-bubble response — enqueue with retry
         else if (response.reply_bubbles && response.reply_bubbles.length > 0) {
-          this.logger.info('-'.repeat(60));
-          this.logger.info(`📤 SENDING ${response.reply_bubbles.length} BUBBLES to ${message.threadId}`);
-          for (let i = 0; i < response.reply_bubbles.length; i++) {
-            this.logger.info(`   [${i + 1}/${response.reply_bubbles.length}]: "${response.reply_bubbles[i]}"`);
-          }
-          this.logger.info('-'.repeat(60));
-
-          const sent = await this.transport.sendMultiBubble(
+          this.logger.info(`📤 Enqueuing ${response.reply_bubbles.length} bubbles for ${message.threadId}`);
+          this.sendQueue.enqueueMultiBubble(
             message.threadId,
             response.reply_bubbles,
-            message.isGroup
-          );
-
-          // Track multi-bubble message sent
-          this.amplitude.trackMessageSent(
-            message.threadId,
             message.isGroup,
-            'multi',
-            sent
+            true,
+            () => {
+              this.amplitude.trackMessageSent(message.threadId, message.isGroup, 'multi', true);
+              this.logger.info('✅ All bubbles DELIVERED to iMessage');
+            }
           );
-
-          if (sent) {
-            this.logger.info('✅ All bubbles DELIVERED to iMessage');
-          } else {
-            this.logger.error('❌ FAILED to deliver bubbles to iMessage');
-          }
         }
-        // Legacy single bubble
+        // Legacy single bubble — enqueue with retry
         else if (response.reply_text) {
-          this.logger.info('-'.repeat(60));
-          this.logger.info(`📤 SENDING RESPONSE to ${message.threadId}`);
-          this.logger.info(`   Text: "${response.reply_text}"`);
-          this.logger.info('-'.repeat(60));
-
-          const sent = await this.transport.sendMessage(
+          this.logger.info(`📤 Enqueuing response for ${message.threadId}: "${response.reply_text.substring(0, 50)}..."`);
+          this.sendQueue.enqueue(
             message.threadId,
             response.reply_text,
-            message.isGroup
-          );
-
-          // Track single message sent
-          this.amplitude.trackMessageSent(
-            message.threadId,
             message.isGroup,
-            'single',
-            sent
+            () => {
+              this.amplitude.trackMessageSent(message.threadId, message.isGroup, 'single', true);
+              this.logger.info('✅ Response DELIVERED to iMessage');
+            }
           );
-
-          if (sent) {
-            this.logger.info('✅ Response DELIVERED to iMessage');
-          } else {
-            this.logger.error('❌ FAILED to deliver response to iMessage');
-          }
         }
       } else {
         this.logger.info('ℹ️  Backend did not request a response');
@@ -1063,6 +1034,9 @@ class EdgeAgent {
     this.pollInterval = null;
     this.syncInterval = null;
 
+    // Stop send queue
+    this.sendQueue.stop();
+
     // Disconnect WebSocket
     this.wsClient.disconnect();
 
@@ -1104,6 +1078,7 @@ class EdgeAgent {
       backend_url: this.config.backend.url,
       imessage_poll_interval: this.config.imessage.poll_interval_seconds,
       performance_profile: this.config.performance?.profile || 'balanced',
+      send_queue: this.sendQueue.getStats(),
     };
   }
 
