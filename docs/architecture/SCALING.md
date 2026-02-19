@@ -82,24 +82,26 @@ A single Mac mini can run **4-6 personas** simultaneously (each as a separate ma
 
 ## Hardware Recommendations
 
-### Recommended: Mac mini M2 (2023+)
+### Recommended: Mac mini (Apple Silicon)
 
-| Spec | Minimum | Recommended | High-Capacity |
-|---|---|---|---|
-| **Chip** | M2 (8-core CPU) | M2 Pro (10-core CPU) | M4 Pro (12-core CPU) |
-| **RAM** | 8 GB | 16 GB | 24 GB |
-| **Storage** | 256 GB SSD | 512 GB SSD | 512 GB SSD |
-| **Personas** | 2-3 | 4-6 | 6-8 |
-| **Users (moderate)** | 300-900 | 600-1,800 | 900-2,400 |
-| **Power** | ~5-10W idle | ~5-10W idle | ~5-10W idle |
-| **Price (approx)** | $599 | $1,199 | $1,599 |
+| Spec | Budget | Minimum (new) | Recommended | High-Capacity |
+|---|---|---|---|---|
+| **Chip** | M1 (8-core CPU) | M2 (8-core CPU) | M2 Pro (10-core CPU) | M4 Pro (12-core CPU) |
+| **RAM** | 16 GB | 8 GB | 16 GB | 24 GB |
+| **Storage** | 256 GB SSD | 256 GB SSD | 512 GB SSD | 512 GB SSD |
+| **Personas** | 3-4 | 2-3 | 4-6 | 6-8 |
+| **Users (moderate)** | 450-1,200 | 300-900 | 600-1,800 | 900-2,400 |
+| **Power** | ~5-7W idle | ~5-10W idle | ~5-10W idle | ~5-10W idle |
+| **Price (approx)** | ~$400 refurbished | $599 | $1,199 | $1,599 |
+
+> **Best value pick:** Mac mini M1 16 GB (2020). The edge relay uses <10% CPU and ~200 MB RAM per persona — the M1 is ~90% of M2 single-core performance and the workload doesn't stress multi-core. Buy refurbished for ~$400-450 and run 3-4 personas comfortably. Only go M2+ if buying new.
 
 ### Why Mac mini?
 
 - **Smallest Apple Silicon form factor** — fits in a 1U server shelf or closet
 - **Low power** — 5-10W idle, no fans under edge relay workload
 - **Always-on macOS** — required for Messages.app and AppleScript
-- **Apple Silicon performance** — M2/M4 handles 6+ concurrent edge processes with headroom
+- **Apple Silicon performance** — M1/M2/M4 all handle 4+ concurrent edge processes with headroom
 - **Ethernet + Wi-Fi** — reliable network connectivity
 - **Thunderbolt** — can connect external drives for attachment storage if needed
 
