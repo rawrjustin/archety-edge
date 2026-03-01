@@ -40,6 +40,7 @@ PERSONA_ID=""
 PHONE=""
 EDGE_SECRET=""
 SHARD_ID="1"
+SENTRY_DSN=""
 
 # --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
@@ -51,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --repo-url)     REPO_URL="$2";     shift 2 ;;
     --environment)  ENVIRONMENT="$2";  shift 2 ;;
     --shard-id)     SHARD_ID="$2";     shift 2 ;;
+    --sentry-dsn)   SENTRY_DSN="$2";   shift 2 ;;
     --help|-h)
       echo "Usage: sudo $0 --persona-id <id> --phone <E.164> --edge-secret <secret> [--shard-id <n>]"
       echo ""
@@ -64,6 +66,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --repo-url      Git repo URL (default: archety-edge)"
       echo "  --environment   production or development (default: production)"
       echo "  --shard-id      Numeric shard suffix for user/agent naming (default: 1)"
+      echo "  --sentry-dsn    Sentry DSN for edge runtime error tracking (optional)"
       exit 0
       ;;
     *) log_error "Unknown option: $1"; exit 1 ;;
@@ -131,6 +134,11 @@ echo "  Phone:        ${PHONE}"
 echo "  Backend:      ${BACKEND_URL}"
 echo "  Environment:  ${ENVIRONMENT}"
 echo "  Shard:        ${SHARD_ID}"
+if [[ -n "${SENTRY_DSN}" ]]; then
+  echo "  Sentry:       enabled"
+else
+  echo "  Sentry:       disabled"
+fi
 echo ""
 
 # =============================================================================
@@ -244,6 +252,11 @@ log_done "TypeScript and admin portal built"
 # =============================================================================
 log_step "Generating config.yaml"
 
+SENTRY_ENABLED="false"
+if [[ -n "${SENTRY_DSN}" ]]; then
+  SENTRY_ENABLED="true"
+fi
+
 cat > "${PROJECT_DIR}/config.yaml" << YAML
 edge:
   agent_id: "${MAC_USER}"
@@ -282,7 +295,9 @@ logging:
 
 monitoring:
   sentry:
-    enabled: false
+    enabled: ${SENTRY_ENABLED}
+    dsn: "${SENTRY_DSN}"
+    environment: "${ENVIRONMENT}"
   amplitude:
     enabled: true
     api_key: "\${AMPLITUDE_API_KEY}"
@@ -309,6 +324,7 @@ EDGE_SECRET=${EDGE_SECRET}
 BACKEND_URL=${BACKEND_URL}
 USER_PHONE=${PHONE}
 EDGE_AGENT_ID=${MAC_USER}
+SENTRY_DSN=${SENTRY_DSN}
 ADMIN_PORT=${ADMIN_PORT}
 ENV
 
@@ -393,6 +409,8 @@ cat > "$PLIST_PATH" << PLIST
         <string>${PHONE}</string>
         <key>EDGE_AGENT_ID</key>
         <string>${MAC_USER}</string>
+        <key>SENTRY_DSN</key>
+        <string>${SENTRY_DSN}</string>
         <key>ADMIN_PORT</key>
         <string>${ADMIN_PORT}</string>
     </dict>
