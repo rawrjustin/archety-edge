@@ -34,14 +34,9 @@ logging:
 
 monitoring:
   sentry:
-    enabled: false  # Set to true and add DSN to enable error tracking
-    # dsn: "https://your-sentry-dsn@sentry.io/project-id"
-    environment: "development"
-    traces_sample_rate: 0.1  # 10% of transactions for performance monitoring
-    profiles_sample_rate: 0.1  # 10% profiling
-  amplitude:
-    enabled: true  # Set to true and add API key to enable analytics
-    api_key: "${AMPLITUDE_API_KEY}"  # Set via environment variable
+    enabled: true
+    dsn: "https://0708b82c4f7853f3e0f94e2bda698706@o4510292155957248.ingest.us.sentry.io/4510906580729856"
+    environment: "production"
     flush_interval_ms: 10000  # Flush events every 10 seconds
   health_check:
     enabled: true  # Enable health check endpoint
