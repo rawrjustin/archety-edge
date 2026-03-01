@@ -1,6 +1,6 @@
 edge:
   agent_id: "sage1"  # Human-friendly identifier for this device
-  user_phone: "+13238407486"    # Mac mini iMessage account
+  user_phone: "+13107404018"    # Mac mini iMessage account
 
 backend:
   url: "https://archety-backend-dev.up.railway.app"

@@ -165,7 +165,7 @@ app.post('/api/send-message', async (req, res) => {
 ## Authentication
 
 Edge agent sends:
-- **Query param:** `edge_agent_id` (e.g., `edge_13238407486`)
+- **Query param:** `edge_agent_id` (e.g., `edge_13107404018`)
 - **Header:** `Authorization: Bearer {EDGE_SECRET}`
 - **Header:** `X-Edge-Agent-Id: {edge_agent_id}`
 
@@ -190,7 +190,7 @@ Edge client now sends `X-Edge-Agent-Id` header in HTTP requests:
 ```http
 POST /edge/message
 Authorization: Bearer {EDGE_SECRET}
-X-Edge-Agent-Id: edge_13238407486  ← Use this to look up WebSocket!
+X-Edge-Agent-Id: edge_13107404018  ← Use this to look up WebSocket!
 Content-Type: application/json
 
 {
@@ -267,15 +267,15 @@ app.post('/edge/message', async (req, res) => {
 
 Backend should log:
 ```
-[WebSocket] Connected: edge_13238407486 (total: 1)
-[HTTP POST] Received from edge_13238407486
-[Reflex] WebSocket found for edge_13238407486 ✅
-[Reflex] Sent "okie lemme see" via WebSocket to edge_13238407486
+[WebSocket] Connected: edge_13107404018 (total: 1)
+[HTTP POST] Received from edge_13107404018
+[Reflex] WebSocket found for edge_13107404018 ✅
+[Reflex] Sent "okie lemme see" via WebSocket to edge_13107404018
 ```
 
 If WebSocket not found:
 ```
-[HTTP POST] Received from edge_13238407486
+[HTTP POST] Received from edge_13107404018
 [Reflex] WebSocket NOT found ❌ (will return in HTTP response only)
 ```
 
@@ -298,7 +298,7 @@ You'll see connection attempts every few seconds.
 Once you deploy, you should see in edge agent logs:
 
 ```
-[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13238407486
+[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13107404018
 [INFO] ✅ WebSocket connected - real-time mode enabled
 [INFO] 🔌 WebSocket connected - real-time command delivery enabled
 ```
@@ -308,11 +308,11 @@ Once you deploy, you should see in edge agent logs:
 Send a command via WebSocket:
 
 ```typescript
-sendCommandToEdge('edge_13238407486', {
+sendCommandToEdge('edge_13107404018', {
   command_id: 'test_001',
   command_type: 'schedule_message',
   payload: {
-    thread_id: '+13238407486',
+    thread_id: '+13107404018',
     message_text: 'Test message from WebSocket!',
     send_at: new Date(Date.now() + 5000).toISOString() // 5 seconds from now
   }

@@ -157,7 +157,7 @@ this.ws = new WebSocket(wsUrl, {
 
 **Credentials:**
 - Secret: From `EDGE_SECRET` environment variable (used for BOTH HTTP and WebSocket)
-- Edge Agent ID: `edge_13238407486`
+- Edge Agent ID: `edge_13107404018`
 
 ---
 
@@ -169,7 +169,7 @@ this.ws = new WebSocket(wsUrl, {
 
 1. **Edge Client Connects WebSocket:**
    ```
-   wss://backend/edge/ws?edge_agent_id=edge_13238407486
+   wss://backend/edge/ws?edge_agent_id=edge_13107404018
    Authorization: Bearer {EDGE_SECRET}
    ```
 
@@ -177,7 +177,7 @@ this.ws = new WebSocket(wsUrl, {
    ```http
    POST /edge/message
    Authorization: Bearer {EDGE_SECRET}
-   X-Edge-Agent-Id: edge_13238407486  ← NEW: Correlates to WebSocket
+   X-Edge-Agent-Id: edge_13107404018  ← NEW: Correlates to WebSocket
    ```
 
 3. **Backend Correlates HTTP to WebSocket:**
@@ -346,7 +346,7 @@ Send a test command:
     "timestamp": "2025-11-06T00:30:00Z",
     "priority": "immediate",
     "payload": {
-      "thread_id": "+13238407486",
+      "thread_id": "+13107404018",
       "message_text": "Test from WebSocket!",
       "send_at": "2025-11-06T00:30:05Z",
       "is_group": false
