@@ -54,21 +54,22 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 MAC_USER="${PERSONA_ID}${SHARD_ID}"
+USER_HOME="/Users/${MAC_USER}"
 PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
-PLIST_PATH="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
+PLIST_PATH="${USER_HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
+OLD_SYSTEM_PLIST="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
 
 echo ""
 echo -e "${BOLD}Tearing down edge agent: ${PERSONA_ID}${NC}"
 echo ""
 
-# --- Stop and remove LaunchDaemon ---
-if launchctl list 2>/dev/null | grep -q "$PLIST_LABEL"; then
-  log_info "Stopping service..."
-  launchctl bootout "system/${PLIST_LABEL}" 2>/dev/null || true
-  launchctl unload "$PLIST_PATH" 2>/dev/null || true
-  log_done "Service stopped"
-else
-  log_warn "Service '${PLIST_LABEL}' not running"
+# Get the persona user's UID for gui domain operations
+MAC_USER_UID=$(dscl . -read "/Users/${MAC_USER}" UniqueID 2>/dev/null | awk '{print $2}')
+
+# --- Stop and remove LaunchAgent (user domain) ---
+if [[ -n "$MAC_USER_UID" ]]; then
+  launchctl bootout "gui/${MAC_USER_UID}/${PLIST_LABEL}" 2>/dev/null || true
+  log_done "User-domain service stopped (gui/${MAC_USER_UID})"
 fi
 
 if [[ -f "$PLIST_PATH" ]]; then
@@ -76,6 +77,19 @@ if [[ -f "$PLIST_PATH" ]]; then
   log_done "Plist removed: ${PLIST_PATH}"
 else
   log_warn "Plist not found: ${PLIST_PATH}"
+fi
+
+# --- Clean up old system-domain plist if it exists ---
+if launchctl list 2>/dev/null | grep -q "$PLIST_LABEL"; then
+  log_warn "Stopping old system-domain service..."
+  launchctl bootout "system/${PLIST_LABEL}" 2>/dev/null || true
+  launchctl unload "$OLD_SYSTEM_PLIST" 2>/dev/null || true
+  log_done "System-domain service stopped"
+fi
+
+if [[ -f "$OLD_SYSTEM_PLIST" ]]; then
+  rm -f "$OLD_SYSTEM_PLIST"
+  log_done "Old system-domain plist removed: ${OLD_SYSTEM_PLIST}"
 fi
 
 # Clean up legacy daemon if this persona is sage

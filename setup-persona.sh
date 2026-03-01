@@ -347,15 +347,19 @@ sudo -u "$MAC_USER" mkdir -p "${PROJECT_DIR}/logs"
 log_done "data/ and logs/ directories created"
 
 # =============================================================================
-# Step 8: Install LaunchDaemon
+# Step 8: Install LaunchAgent (user domain — required for TCC/Messages.app access)
 # =============================================================================
-log_step "Installing LaunchDaemon"
+log_step "Installing LaunchAgent"
 
 PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
-PLIST_PATH="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
+LAUNCH_AGENTS_DIR="${USER_HOME}/Library/LaunchAgents"
+PLIST_PATH="${LAUNCH_AGENTS_DIR}/${PLIST_LABEL}.plist"
 ENTRY_FILE="${PROJECT_DIR}/dist/admin-portal/server/index.js"
 
-# Clean up legacy daemons that may conflict
+# Ensure LaunchAgents directory exists
+sudo -u "$MAC_USER" mkdir -p "$LAUNCH_AGENTS_DIR"
+
+# Clean up legacy daemons that may conflict (old system-domain plists)
 for LEGACY_LABEL in "com.sage.edge-agent" "com.archety.edge-agent"; do
   LEGACY_PLIST="/Library/LaunchDaemons/${LEGACY_LABEL}.plist"
   if launchctl list 2>/dev/null | grep -q "$LEGACY_LABEL"; then
@@ -369,11 +373,24 @@ for LEGACY_LABEL in "com.sage.edge-agent" "com.archety.edge-agent"; do
   fi
 done
 
-# Stop existing service if running
+# Also clean up any old system-domain plist for this persona
+OLD_SYSTEM_PLIST="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
 if launchctl list 2>/dev/null | grep -q "$PLIST_LABEL"; then
   log_warn "Stopping existing service..."
   launchctl bootout "system/${PLIST_LABEL}" 2>/dev/null || true
-  launchctl unload "$PLIST_PATH" 2>/dev/null || true
+  launchctl unload "$OLD_SYSTEM_PLIST" 2>/dev/null || true
+fi
+if [[ -f "$OLD_SYSTEM_PLIST" ]]; then
+  log_warn "Removing old system-domain plist: ${OLD_SYSTEM_PLIST}"
+  rm -f "$OLD_SYSTEM_PLIST"
+fi
+
+# Get the persona user's UID for gui domain operations
+MAC_USER_UID=$(dscl . -read "/Users/${MAC_USER}" UniqueID 2>/dev/null | awk '{print $2}')
+
+# Stop existing user-domain service if running
+if [[ -n "$MAC_USER_UID" ]]; then
+  launchctl bootout "gui/${MAC_USER_UID}/${PLIST_LABEL}" 2>/dev/null || true
 fi
 
 cat > "$PLIST_PATH" << PLIST
@@ -393,9 +410,6 @@ cat > "$PLIST_PATH" << PLIST
 
     <key>WorkingDirectory</key>
     <string>${PROJECT_DIR}</string>
-
-    <key>UserName</key>
-    <string>${MAC_USER}</string>
 
     <key>RunAtLoad</key>
     <true/>
@@ -440,9 +454,10 @@ cat > "$PLIST_PATH" << PLIST
 </plist>
 PLIST
 
-chown root:wheel "$PLIST_PATH"
+chown "${MAC_USER}:staff" "$PLIST_PATH"
 chmod 644 "$PLIST_PATH"
-log_done "LaunchDaemon installed: ${PLIST_LABEL}"
+log_done "LaunchAgent installed: ${PLIST_LABEL}"
+log_done "Plist path: ${PLIST_PATH}"
 
 # =============================================================================
 # Step 9: Update port registry
@@ -482,7 +497,7 @@ log_done "Repo at ${PROJECT_DIR}"
 log_done "Dependencies installed and built"
 log_done "config.yaml generated (health: ${HEALTH_PORT}, admin: ${ADMIN_PORT})"
 log_done ".env generated"
-log_done "LaunchDaemon installed: ${PLIST_LABEL}"
+log_done "LaunchAgent installed: ${PLIST_LABEL}"
 echo ""
 echo -e "${YELLOW}${BOLD}MANUAL STEPS REQUIRED:${NC}"
 echo ""
@@ -493,22 +508,18 @@ echo "  2. Open Messages.app and sign in with the Apple ID for ${PHONE}"
 echo ""
 echo "  3. Send a test iMessage from another device to verify iMessage works"
 echo ""
-echo "  4. Grant Full Disk Access:"
-echo "     System Settings -> Privacy & Security -> Full Disk Access -> add ${NODE_PATH}"
-echo ""
-echo "  5. Grant Automation permission (run in Terminal as ${MAC_USER}):"
+echo "  4. Grant Automation permission (run in Terminal as ${MAC_USER}):"
 echo "     osascript -e 'tell application \"Messages\" to get name'"
 echo "     Click \"Allow\" on the permission prompt"
 echo ""
-echo "  6. Switch back to your admin account"
+echo "  5. The LaunchAgent starts automatically on login (RunAtLoad)."
+echo "     To manually start/restart (run as ${MAC_USER}):"
+echo "     launchctl bootout gui/\$(id -u)/${PLIST_LABEL} 2>/dev/null || true"
+echo "     launchctl bootstrap gui/\$(id -u) ${PLIST_PATH}"
+echo "     launchctl kickstart -k gui/\$(id -u)/${PLIST_LABEL}"
 echo ""
-echo "  7. Start/restart the service (system domain):"
-echo "     sudo launchctl bootout system/${PLIST_LABEL} 2>/dev/null || true"
-echo "     sudo launchctl bootstrap system ${PLIST_PATH}"
-echo "     sudo launchctl kickstart -k system/${PLIST_LABEL}"
-echo ""
-echo "  8. Verify service state + health:"
-echo "     sudo launchctl print system/${PLIST_LABEL} | head -n 40"
+echo "  6. Verify service state + health:"
+echo "     launchctl print gui/\$(id -u)/${PLIST_LABEL} | head -n 40"
 echo "     curl -s http://localhost:${HEALTH_PORT}/health"
 echo ""
 echo "  9. Ensure HMAC token wiring is present (if using older archety-edge checkout):"

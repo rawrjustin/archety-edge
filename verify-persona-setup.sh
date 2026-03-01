@@ -47,9 +47,11 @@ if ! echo "$SHARD_ID" | grep -qE '^[1-9][0-9]*$'; then
 fi
 
 MAC_USER="${PERSONA_ID}${SHARD_ID}"
-PROJECT_DIR="/Users/${MAC_USER}/Code/archety-edge"
+USER_HOME="/Users/${MAC_USER}"
+PROJECT_DIR="${USER_HOME}/Code/archety-edge"
 PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
-PLIST_PATH="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
+PLIST_PATH="${USER_HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
+MAC_USER_UID=$(dscl . -read "/Users/${MAC_USER}" UniqueID 2>/dev/null | awk '{print $2}')
 
 CHECKS_PASSED=0
 CHECKS_FAILED=0
@@ -90,7 +92,7 @@ fi
 
 require_file "${PROJECT_DIR}/config.yaml" "config.yaml"
 require_file "${PROJECT_DIR}/.env" ".env"
-require_file "${PLIST_PATH}" "LaunchDaemon plist"
+require_file "${PLIST_PATH}" "LaunchAgent plist"
 
 log_step "Legacy daemon conflicts"
 for LEGACY_LABEL in "com.sage.edge-agent" "com.archety.edge-agent"; do
@@ -124,16 +126,26 @@ if [[ -f "${PROJECT_DIR}/.env" ]]; then
   grep -q '^EDGE_AGENT_ID=' "${PROJECT_DIR}/.env" && check_ok ".env has EDGE_AGENT_ID" || check_fail ".env missing EDGE_AGENT_ID"
 fi
 
-log_step "LaunchDaemon state"
-if launchctl print "system/${PLIST_LABEL}" >/tmp/${PLIST_LABEL}.print 2>/dev/null; then
-  check_ok "launchd service exists in system domain: ${PLIST_LABEL}"
+log_step "LaunchAgent state"
+if [[ -n "$MAC_USER_UID" ]] && launchctl print "gui/${MAC_USER_UID}/${PLIST_LABEL}" >/tmp/${PLIST_LABEL}.print 2>/dev/null; then
+  check_ok "launchd service exists in user domain: gui/${MAC_USER_UID}/${PLIST_LABEL}"
   if grep -q 'state = running' /tmp/${PLIST_LABEL}.print; then
     check_ok "service state is running"
   else
     check_fail "service is not running"
   fi
 else
-  check_fail "launchd service not loaded: system/${PLIST_LABEL}"
+  # Fall back to checking system domain for old installs
+  if launchctl print "system/${PLIST_LABEL}" >/tmp/${PLIST_LABEL}.print 2>/dev/null; then
+    check_warn "service found in system domain (should be migrated to user domain)"
+    if grep -q 'state = running' /tmp/${PLIST_LABEL}.print; then
+      check_ok "service state is running (system domain)"
+    else
+      check_fail "service is not running"
+    fi
+  else
+    check_fail "launchd service not loaded in gui/${MAC_USER_UID} or system domain"
+  fi
 fi
 
 log_step "Native module ABI check"

@@ -1,9 +1,13 @@
 import { ILogger, LogLevel } from '../interfaces/ILogger';
 import * as fs from 'fs';
 
+const MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
+const LOG_CHECK_INTERVAL = 1000; // Check size every N writes
+
 export class Logger implements ILogger {
   private level: LogLevel;
   private logFile: string | null;
+  private writeCount = 0;
   private levels: { [key in LogLevel]: number } = {
     debug: 0,
     info: 1,
@@ -30,6 +34,22 @@ export class Logger implements ILogger {
     return `[${timestamp}] [${level.toUpperCase()}] ${message}${argsStr}`;
   }
 
+  private rotateIfNeeded(): void {
+    if (!this.logFile) return;
+    this.writeCount++;
+    if (this.writeCount % LOG_CHECK_INTERVAL !== 0) return;
+
+    try {
+      const stats = fs.statSync(this.logFile);
+      if (stats.size > MAX_LOG_SIZE) {
+        const rotated = this.logFile + '.1';
+        // Keep one rotated backup
+        try { fs.unlinkSync(rotated); } catch {}
+        fs.renameSync(this.logFile, rotated);
+      }
+    } catch {}
+  }
+
   private log(level: LogLevel, message: string, ...args: any[]): void {
     if (!this.shouldLog(level)) return;
 
@@ -47,6 +67,7 @@ export class Logger implements ILogger {
     // File output
     if (this.logFile) {
       try {
+        this.rotateIfNeeded();
         fs.appendFileSync(this.logFile, formatted + '\n');
       } catch (err) {
         console.error('Failed to write to log file:', err);
