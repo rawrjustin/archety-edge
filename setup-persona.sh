@@ -299,6 +299,7 @@ cat > "${PROJECT_DIR}/.env" << ENV
 EDGE_SECRET=${EDGE_SECRET}
 BACKEND_URL=${BACKEND_URL}
 USER_PHONE=${PHONE}
+EDGE_AGENT_ID=${MAC_USER}
 ADMIN_PORT=${ADMIN_PORT}
 ENV
 
@@ -381,6 +382,8 @@ cat > "$PLIST_PATH" << PLIST
         <string>${BACKEND_URL}</string>
         <key>USER_PHONE</key>
         <string>${PHONE}</string>
+        <key>EDGE_AGENT_ID</key>
+        <string>${MAC_USER}</string>
         <key>ADMIN_PORT</key>
         <string>${ADMIN_PORT}</string>
     </dict>
@@ -453,11 +456,27 @@ echo "     Click \"Allow\" on the permission prompt"
 echo ""
 echo "  6. Switch back to your admin account"
 echo ""
-echo "  7. Start the service:"
-echo "     sudo launchctl load ${PLIST_PATH}"
+echo "  7. Start/restart the service (system domain):"
+echo "     sudo launchctl bootout system/${PLIST_LABEL} 2>/dev/null || true"
+echo "     sudo launchctl bootstrap system ${PLIST_PATH}"
+echo "     sudo launchctl kickstart -k system/${PLIST_LABEL}"
 echo ""
-echo "  8. Verify:"
+echo "  8. Verify service state + health:"
+echo "     sudo launchctl print system/${PLIST_LABEL} | head -n 40"
 echo "     curl -s http://localhost:${HEALTH_PORT}/health"
+echo ""
+echo "  9. Ensure HMAC token wiring is present (if using older archety-edge checkout):"
+echo "     cp /Users/sage1/migrate_hmac_luna.sh ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}.sh"
+echo "     sudo chown ${MAC_USER}:staff ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}.sh"
+echo "     sudo -u ${MAC_USER} bash -lc 'cd ${PROJECT_DIR} && chmod +x migrate_hmac_${PERSONA_ID}.sh && ./migrate_hmac_${PERSONA_ID}.sh'"
+echo ""
+echo " 10. Validate WebSocket auth:"
+echo "     cd ${PROJECT_DIR}"
+echo "     EDGE_AGENT_ID=${MAC_USER} USER_PHONE=${PHONE} node test_websocket.js"
+echo ""
+echo " 11. Check logs:"
+echo "     tail -n 120 ${PROJECT_DIR}/logs/edge-agent.err.log"
+echo "     tail -n 120 ${PROJECT_DIR}/logs/edge-agent.out.log"
 echo ""
 echo -e "${BLUE}View all personas: ./list-personas.sh${NC}"
 echo -e "${BLUE}Remove this persona: sudo ./teardown-persona.sh --persona-id ${PERSONA_ID}${NC}"

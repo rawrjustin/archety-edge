@@ -42,8 +42,10 @@ if [ ! -f ".env" ]; then
     echo "⚠️  Please edit .env and add:"
     echo "   - EDGE_SECRET (shared secret from backend team)"
     echo "   - USER_PHONE (E.164, e.g. +13107404018)"
-    echo "   - EDGE_AGENT_ID (e.g. edge_13107404018)"
+    echo "   - EDGE_AGENT_ID (e.g. luna1 or edge_13107404018)"
     echo "   - REGISTRATION_TOKEN (if your flow still requires it)"
+    echo ""
+    echo "   Note: backend expects HMAC bearer tokens (not raw EDGE_SECRET as bearer)."
     echo
     read -p "Press Enter after you've edited .env..."
 fi
