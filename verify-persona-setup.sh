@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verify multi-persona edge setup after running setup-persona.sh
 # Usage:
-#   sudo ./verify-persona-setup.sh --persona-id luna --phone +12137288322 [--backend-url https://api.ikiro.ai]
+#   sudo ./verify-persona-setup.sh --persona-id luna --shard-id 1 --phone +12137288322 [--backend-url https://api.ikiro.ai]
 
 set -euo pipefail
 
@@ -18,16 +18,18 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step()  { echo -e "\n${BLUE}${BOLD}==> $1${NC}"; }
 
 PERSONA_ID=""
+SHARD_ID="1"
 PHONE=""
 BACKEND_URL="https://api.ikiro.ai"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --persona-id) PERSONA_ID="$2"; shift 2 ;;
+    --shard-id) SHARD_ID="$2"; shift 2 ;;
     --phone) PHONE="$2"; shift 2 ;;
     --backend-url) BACKEND_URL="$2"; shift 2 ;;
     --help|-h)
-      echo "Usage: sudo $0 --persona-id <id> --phone <E.164> [--backend-url <url>]"
+      echo "Usage: sudo $0 --persona-id <id> --shard-id <n> --phone <E.164> [--backend-url <url>]"
       exit 0
       ;;
     *) log_error "Unknown option: $1"; exit 1 ;;
@@ -39,9 +41,14 @@ if [[ -z "$PERSONA_ID" || -z "$PHONE" ]]; then
   exit 1
 fi
 
-MAC_USER="${PERSONA_ID}1"
+if ! echo "$SHARD_ID" | grep -qE '^[1-9][0-9]*$'; then
+  log_error "--shard-id must be a positive integer (e.g., 1, 2, 3)"
+  exit 1
+fi
+
+MAC_USER="${PERSONA_ID}${SHARD_ID}"
 PROJECT_DIR="/Users/${MAC_USER}/Code/archety-edge"
-PLIST_LABEL="com.archety.edge-${PERSONA_ID}"
+PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
 PLIST_PATH="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
 
 CHECKS_PASSED=0

@@ -39,6 +39,7 @@ PORT_REGISTRY="/usr/local/etc/archety-edge-ports.json"
 PERSONA_ID=""
 PHONE=""
 EDGE_SECRET=""
+SHARD_ID="1"
 
 # --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
@@ -49,8 +50,9 @@ while [[ $# -gt 0 ]]; do
     --backend-url)  BACKEND_URL="$2";  shift 2 ;;
     --repo-url)     REPO_URL="$2";     shift 2 ;;
     --environment)  ENVIRONMENT="$2";  shift 2 ;;
+    --shard-id)     SHARD_ID="$2";     shift 2 ;;
     --help|-h)
-      echo "Usage: sudo $0 --persona-id <id> --phone <E.164> --edge-secret <secret>"
+      echo "Usage: sudo $0 --persona-id <id> --phone <E.164> --edge-secret <secret> [--shard-id <n>]"
       echo ""
       echo "Required:"
       echo "  --persona-id    Persona identifier (e.g., vex, echo, kael)"
@@ -61,6 +63,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --backend-url   Backend URL (default: prod)"
       echo "  --repo-url      Git repo URL (default: archety-edge)"
       echo "  --environment   production or development (default: production)"
+      echo "  --shard-id      Numeric shard suffix for user/agent naming (default: 1)"
       exit 0
       ;;
     *) log_error "Unknown option: $1"; exit 1 ;;
@@ -94,6 +97,11 @@ if ! echo "$PHONE" | grep -qE '^\+[1-9][0-9]{1,14}$'; then
   exit 1
 fi
 
+if ! echo "$SHARD_ID" | grep -qE '^[1-9][0-9]*$'; then
+  log_error "--shard-id must be a positive integer (e.g., 1, 2, 3)"
+  exit 1
+fi
+
 # --- Check prerequisites ---
 if [[ "$EUID" -ne 0 ]]; then
   log_error "This script must be run with sudo"
@@ -110,7 +118,7 @@ for cmd in node npm git; do
 done
 
 # --- Derived values ---
-MAC_USER="${PERSONA_ID}1"
+MAC_USER="${PERSONA_ID}${SHARD_ID}"
 USER_HOME="/Users/${MAC_USER}"
 PROJECT_DIR="${USER_HOME}/Code/archety-edge"
 NODE_PATH="$(which node)"
@@ -122,6 +130,7 @@ echo "  macOS user:   ${MAC_USER}"
 echo "  Phone:        ${PHONE}"
 echo "  Backend:      ${BACKEND_URL}"
 echo "  Environment:  ${ENVIRONMENT}"
+echo "  Shard:        ${SHARD_ID}"
 echo ""
 
 # =============================================================================
@@ -180,7 +189,7 @@ log_step "Creating macOS user account"
 if dscl . -read "/Users/${MAC_USER}" &>/dev/null; then
   log_warn "User '${MAC_USER}' already exists, skipping creation"
 else
-  FULL_NAME="$(echo "${PERSONA_ID}" | sed 's/./\U&/') Agent"
+  FULL_NAME="$(echo "${PERSONA_ID}" | sed 's/./\U&/') Agent ${SHARD_ID}"
   sysadminctl -addUser "$MAC_USER" -fullName "$FULL_NAME" -password "$MACOS_PASSWORD" -admin 2>&1 | grep -v "^$" || true
   log_done "Created user '${MAC_USER}' (password: ${MACOS_PASSWORD})"
 fi
@@ -283,7 +292,7 @@ monitoring:
     port: ${HEALTH_PORT}
 
 security:
-  keychain_service: "com.archety.edge.${PERSONA_ID}"
+  keychain_service: "com.archety.edge.${PERSONA_ID}.${SHARD_ID}"
   keychain_account: "edge-state"
 YAML
 
@@ -321,7 +330,7 @@ log_done "data/ and logs/ directories created"
 # =============================================================================
 log_step "Installing LaunchDaemon"
 
-PLIST_LABEL="com.archety.edge-${PERSONA_ID}"
+PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
 PLIST_PATH="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
 ENTRY_FILE="${PROJECT_DIR}/dist/admin-portal/server/index.js"
 
@@ -410,7 +419,7 @@ registry_path = '$PORT_REGISTRY'
 with open(registry_path) as f:
     registry = json.load(f)
 
-registry['$PERSONA_ID'] = {
+registry['$PERSONA_ID-$SHARD_ID'] = {
     'health': $HEALTH_PORT,
     'admin': $ADMIN_PORT,
     'user': '$MAC_USER',
@@ -428,7 +437,7 @@ log_done "Port registry updated"
 # Done — Print manual steps
 # =============================================================================
 echo ""
-echo -e "${BOLD}===== SETUP COMPLETE: ${PERSONA_ID} =====${NC}"
+echo -e "${BOLD}===== SETUP COMPLETE: ${PERSONA_ID} (shard ${SHARD_ID}) =====${NC}"
 echo ""
 echo -e "${GREEN}Automated steps completed:${NC}"
 log_done "macOS user '${MAC_USER}' ready"
@@ -466,9 +475,9 @@ echo "     sudo launchctl print system/${PLIST_LABEL} | head -n 40"
 echo "     curl -s http://localhost:${HEALTH_PORT}/health"
 echo ""
 echo "  9. Ensure HMAC token wiring is present (if using older archety-edge checkout):"
-echo "     cp /Users/sage1/migrate_hmac_luna.sh ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}.sh"
-echo "     sudo chown ${MAC_USER}:staff ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}.sh"
-echo "     sudo -u ${MAC_USER} bash -lc 'cd ${PROJECT_DIR} && chmod +x migrate_hmac_${PERSONA_ID}.sh && ./migrate_hmac_${PERSONA_ID}.sh'"
+echo "     cp /Users/sage1/migrate_hmac_luna.sh ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh"
+echo "     sudo chown ${MAC_USER}:staff ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh"
+echo "     sudo -u ${MAC_USER} bash -lc 'cd ${PROJECT_DIR} && chmod +x migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh && ./migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh'"
 echo ""
 echo " 10. Validate WebSocket auth:"
 echo "     cd ${PROJECT_DIR}"
@@ -479,8 +488,8 @@ echo "     tail -n 120 ${PROJECT_DIR}/logs/edge-agent.err.log"
 echo "     tail -n 120 ${PROJECT_DIR}/logs/edge-agent.out.log"
 echo ""
 echo " 12. Run full verification script:"
-echo "     sudo ./verify-persona-setup.sh --persona-id ${PERSONA_ID} --phone ${PHONE} --backend-url ${BACKEND_URL}"
+echo "     sudo ./verify-persona-setup.sh --persona-id ${PERSONA_ID} --shard-id ${SHARD_ID} --phone ${PHONE} --backend-url ${BACKEND_URL}"
 echo ""
 echo -e "${BLUE}View all personas: ./list-personas.sh${NC}"
-echo -e "${BLUE}Remove this persona: sudo ./teardown-persona.sh --persona-id ${PERSONA_ID}${NC}"
+echo -e "${BLUE}Remove this persona: sudo ./teardown-persona.sh --persona-id ${PERSONA_ID} --shard-id ${SHARD_ID}${NC}"
 echo ""
