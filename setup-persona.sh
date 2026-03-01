@@ -9,7 +9,7 @@
 #     --edge-secret "your_shared_secret"
 #
 # Optional:
-#   --backend-url "https://archety-backend-prod.up.railway.app"
+#   --backend-url "https://api.ikiro.ai"
 #   --repo-url "git@github.com:rawrjustin/archety-edge.git"
 #   --environment "production"
 # =============================================================================
@@ -31,8 +31,8 @@ log_step()  { echo -e "\n${BLUE}${BOLD}==> $1${NC}"; }
 log_done()  { echo -e "  ${GREEN}[done]${NC} $1"; }
 
 # --- Defaults ---
-BACKEND_URL="https://archety-backend-prod.up.railway.app"
-REPO_URL="git@github.com:rawrjustin/archety-edge.git"
+BACKEND_URL="https://api.ikiro.ai"
+REPO_URL="https://github.com/rawrjustin/archety-edge.git"
 ENVIRONMENT="production"
 MACOS_PASSWORD="archety"
 PORT_REGISTRY="/usr/local/etc/archety-edge-ports.json"

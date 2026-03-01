@@ -11,7 +11,7 @@ require('dotenv').config();
 
 const EDGE_SECRET = process.env.EDGE_SECRET;
 const EDGE_AGENT_ID = "edge_13107404018";
-const BACKEND_URL = process.env.BACKEND_URL || "https://archety-backend-dev.up.railway.app";
+const BACKEND_URL = process.env.BACKEND_URL || "https://api-dev.ikiro.ai";
 const WS_URL = BACKEND_URL.replace('https://', 'wss://').replace('http://', 'ws://');
 
 console.log('='.repeat(60));

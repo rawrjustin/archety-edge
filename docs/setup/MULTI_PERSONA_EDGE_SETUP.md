@@ -183,8 +183,8 @@ edge:
   persona_id: "vex"
 
 backend:
-  url: "https://archety-backend-prod.up.railway.app"
-  websocket_url: "wss://archety-backend-prod.up.railway.app"
+  url: "https://api.ikiro.ai"
+  websocket_url: "wss://api.ikiro.ai"
   sync_interval_seconds: 30
 
 websocket:
@@ -234,7 +234,7 @@ security:
 
 ```bash
 EDGE_SECRET=<shared-edge-secret>
-BACKEND_URL=https://archety-backend-prod.up.railway.app
+BACKEND_URL=https://api.ikiro.ai
 USER_PHONE=+1XXXXXXXXXX
 AMPLITUDE_API_KEY=<amplitude-key>
 ```

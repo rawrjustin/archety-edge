@@ -89,7 +89,7 @@ try {
 ### Step 4: Test It
 ```bash
 # Test with curl
-curl -X POST https://archety-backend-dev.up.railway.app/orchestrator/message \
+curl -X POST https://api-dev.ikiro.ai/orchestrator/message \
   -H "Authorization: Bearer $EDGE_SECRET" \
   -H "Content-Type: application/json" \
   -d '{
@@ -124,7 +124,7 @@ See: [`EDGE_CLIENT_UPDATES_NOV_2025.md`](./EDGE_CLIENT_UPDATES_NOV_2025.md)
 ## 📞 Need Help?
 
 - Backend Engineer: Engineer 2
-- Backend Docs: https://archety-backend-prod.up.railway.app/docs
+- Backend Docs: https://api.ikiro.ai/docs
 - Edge Spec: `/docs/edge/EDGE_AGENT_SPEC.md`
 
 ---

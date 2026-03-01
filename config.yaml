@@ -3,8 +3,8 @@ edge:
   user_phone: "+13107404018"    # Mac mini iMessage account
 
 backend:
-  url: "https://archety-backend-dev.up.railway.app"
-  websocket_url: "wss://archety-backend-dev.up.railway.app"  # WebSocket URL (derived from url if not set)
+  url: "https://api-dev.ikiro.ai"
+  websocket_url: "wss://api-dev.ikiro.ai"  # WebSocket URL (derived from url if not set)
   sync_interval_seconds: 30  # Fallback polling interval if WebSocket disconnects
 
 websocket:

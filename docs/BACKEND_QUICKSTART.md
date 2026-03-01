@@ -5,7 +5,7 @@
 The edge agent is ready and waiting for your WebSocket endpoint at:
 
 ```
-wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id={edge_agent_id}
+wss://api.ikiro.ai/edge/ws?edge_agent_id={edge_agent_id}
 ```
 
 ## What You Need to Build
@@ -298,7 +298,7 @@ You'll see connection attempts every few seconds.
 Once you deploy, you should see in edge agent logs:
 
 ```
-[INFO] Connecting to WebSocket: wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13107404018
+[INFO] Connecting to WebSocket: wss://api.ikiro.ai/edge/ws?edge_agent_id=edge_13107404018
 [INFO] ✅ WebSocket connected - real-time mode enabled
 [INFO] 🔌 WebSocket connected - real-time command delivery enabled
 ```

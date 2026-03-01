@@ -44,7 +44,7 @@ This document specifies the WebSocket implementation requirements for real-time 
 ### URL
 
 ```
-wss://your-backend.railway.app/edge/ws
+wss://api.ikiro.ai/edge/ws
 ```
 
 ### Query Parameters
@@ -62,7 +62,7 @@ wss://your-backend.railway.app/edge/ws
 ### Example Connection
 
 ```
-wss://archety-backend-production.up.railway.app/edge/ws?edge_agent_id=edge_13107404018
+wss://api.ikiro.ai/edge/ws?edge_agent_id=edge_13107404018
 
 Headers:
   Authorization: Bearer 74a0e606d739d31eda5dafb6f7e0f345d4756df0fe908282715174fd8978e261
