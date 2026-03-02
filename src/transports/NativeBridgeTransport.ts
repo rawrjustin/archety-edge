@@ -8,6 +8,8 @@ interface NativeBridgeTransportOptions {
   args: string[];
   attachmentsPath: string;
   dbPath: string;
+  stateFilePath?: string;
+  maxMessageAgeSeconds?: number;
 }
 
 export class NativeBridgeTransport implements IMessageTransport {
@@ -21,17 +23,27 @@ export class NativeBridgeTransport implements IMessageTransport {
     private readonly logger: ILogger
   ) {
     this.sender = new AppleScriptSender(logger);
+    const bridgeArgs = [
+      '--db-path',
+      options.dbPath,
+      '--attachments-path',
+      options.attachmentsPath,
+      '--poll-interval-ms',
+      '500'
+    ];
+
+    if (options.stateFilePath) {
+      bridgeArgs.push('--state-file', options.stateFilePath);
+    }
+
+    if (options.maxMessageAgeSeconds) {
+      bridgeArgs.push('--max-message-age-seconds', String(options.maxMessageAgeSeconds));
+    }
+
     this.bridge = new NativeBridgeClient(
       {
         executable: options.executable,
-        args: [
-          '--db-path',
-          options.dbPath,
-          '--attachments-path',
-          options.attachmentsPath,
-          '--poll-interval-ms',
-          '500'
-        ].concat(options.args || [])
+        args: bridgeArgs.concat(options.args || [])
       },
       logger
     );

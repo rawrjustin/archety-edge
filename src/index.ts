@@ -203,7 +203,9 @@ class EdgeAgent {
           executable: this.config.imessage.bridge_executable!,
           args: this.config.imessage.bridge_args || [],
           attachmentsPath,
-          dbPath: this.config.imessage.db_path
+          dbPath: this.config.imessage.db_path,
+          stateFilePath: './data/messages-helper-rowid',
+          maxMessageAgeSeconds: this.config.imessage.max_message_age_seconds
         },
         this.logger
       );
@@ -387,6 +389,17 @@ class EdgeAgent {
       // Filter out messages from the edge client's own phone number to prevent loops
       if (message.sender === this.config.edge.user_phone) {
         this.logger.info(`⏭️  Skipping message from edge client's own number (${message.sender}) to prevent loop`);
+        return;
+      }
+
+      // Defense-in-depth: reject stale messages (iCloud sync can insert old messages with new ROWIDs)
+      const maxAgeSec = this.config.imessage.max_message_age_seconds || 21600;
+      const messageAgeSec = (Date.now() - message.timestamp.getTime()) / 1000;
+      if (messageAgeSec > maxAgeSec) {
+        const ageHours = (messageAgeSec / 3600).toFixed(1);
+        const maxHours = (maxAgeSec / 3600).toFixed(1);
+        this.logger.warn(`⏭️  Skipping stale message from ${message.sender} (age: ${ageHours}h, max: ${maxHours}h) — likely iCloud sync backfill`);
+        this.logger.warn(`   Text: "${message.text.substring(0, 80)}"`);
         return;
       }
 

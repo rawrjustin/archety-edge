@@ -40,12 +40,14 @@ struct Options {
     let attachmentsPath: String
     let pollInterval: TimeInterval
     let stateFile: URL?
+    let maxMessageAgeSeconds: TimeInterval?
 
     static func parse() -> Options {
         var dbPath = NSString(string: "~/Library/Messages/chat.db").expandingTildeInPath
         var attachmentsPath = NSString(string: "~/Library/Messages/Attachments").expandingTildeInPath
         var pollInterval: TimeInterval = 0.5
         var stateFile: URL?
+        var maxMessageAgeSeconds: TimeInterval?
 
         var iterator = CommandLine.arguments.makeIterator()
         _ = iterator.next() // skip executable
@@ -68,6 +70,10 @@ struct Options {
                 if let value = iterator.next() {
                     stateFile = URL(fileURLWithPath: value)
                 }
+            case "--max-message-age-seconds":
+                if let value = iterator.next(), let seconds = Double(value) {
+                    maxMessageAgeSeconds = seconds
+                }
             default:
                 continue
             }
@@ -77,7 +83,8 @@ struct Options {
             dbPath: dbPath,
             attachmentsPath: attachmentsPath,
             pollInterval: pollInterval,
-            stateFile: stateFile
+            stateFile: stateFile,
+            maxMessageAgeSeconds: maxMessageAgeSeconds
         )
     }
 }
@@ -189,6 +196,26 @@ final class MessagesHelper {
             let threadId = sqlite3_column_text(stmt, 4).flatMap { String(cString: $0) } ?? ""
             let sender = sqlite3_column_text(stmt, 5).flatMap { String(cString: $0) } ?? "unknown"
 
+            // Always advance cursor past this message, even if stale
+            lastRowId = rowId
+
+            // Staleness check: skip messages older than max age (iCloud sync protection)
+            if let maxAge = options.maxMessageAgeSeconds {
+                let messageEpoch = Double(dateValue) / 1_000_000_000.0 + 978307200.0
+                let ageSeconds = Date().timeIntervalSince1970 - messageEpoch
+                if ageSeconds > maxAge {
+                    let ageHours = ageSeconds / 3600.0
+                    emitLog(type: "warn", payload: [
+                        "message": "Skipping stale message (age: \(String(format: "%.1f", ageHours))h, max: \(String(format: "%.1f", maxAge / 3600.0))h)",
+                        "sender": sender,
+                        "thread_id": threadId,
+                        "text_preview": String(text.prefix(50)),
+                        "row_id": "\(rowId)"
+                    ])
+                    continue
+                }
+            }
+
             let isGroup = threadId.contains(";-;") || threadId.contains("chat")
             let timestamp = convertAppleTimestamp(dateValue)
             let participants = fetchParticipants(for: threadId)
@@ -206,7 +233,6 @@ final class MessagesHelper {
             )
 
             emitEnvelope(payload)
-            lastRowId = rowId
         }
 
         sqlite3_finalize(stmt)

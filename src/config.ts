@@ -103,6 +103,7 @@ export function loadConfig(configPath: string = './config.yaml'): Config {
   config.imessage.bridge_executable = config.imessage.bridge_executable
     ?? path.join(process.cwd(), 'native', 'messages-helper', '.build', 'release', 'messages-helper');
   config.imessage.bridge_args = config.imessage.bridge_args ?? [];
+  config.imessage.max_message_age_seconds = config.imessage.max_message_age_seconds ?? 21600; // 6 hours
 
   // Apply scheduler defaults
   if (!config.scheduler) {
