@@ -7,7 +7,8 @@ import { z } from 'zod';
 export const ConfigSchema = z.object({
   edge: z.object({
     agent_id: z.string().min(1, 'agent_id is required'),
-    user_phone: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format (E.164)')
+    user_phone: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format (E.164)'),
+    persona_id: z.string().min(1).regex(/^[a-z][a-z0-9_]*$/, 'persona_id must be lowercase alphanumeric').default('sage'),
   }),
 
   backend: z.object({
@@ -66,6 +67,10 @@ export const ConfigSchema = z.object({
     file: z.string().min(1)
   }),
 
+  dev: z.object({
+    enabled: z.boolean().default(false),
+  }).optional(),
+
   monitoring: z.object({
     sentry: z.object({
       enabled: z.boolean(),
@@ -74,10 +79,12 @@ export const ConfigSchema = z.object({
       traces_sample_rate: z.number().min(0).max(1).optional(),
       profiles_sample_rate: z.number().min(0).max(1).optional()
     }).optional(),
-    amplitude: z.object({
+    posthog: z.object({
       enabled: z.boolean(),
       api_key: z.string().optional(),
-      flush_interval_ms: z.number().min(1000).max(60000).optional()
+      host: z.string().url().optional(),
+      flush_interval_ms: z.number().min(1000).max(60000).optional(),
+      feature_flags_enabled: z.boolean().optional()
     }).optional(),
     health_check: z.object({
       enabled: z.boolean().optional(),

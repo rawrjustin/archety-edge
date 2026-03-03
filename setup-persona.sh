@@ -12,6 +12,9 @@
 #   --backend-url "https://api.ikiro.ai"
 #   --repo-url "git@github.com:rawrjustin/archety-edge.git"
 #   --environment "production"
+#   --sentry-dsn "https://xxx@oXXX.ingest.sentry.io/YYY"
+#   --posthog-key "your_posthog_project_api_key"
+#   --shard-id "1"
 # =============================================================================
 
 set -e
@@ -41,6 +44,7 @@ PHONE=""
 EDGE_SECRET=""
 SHARD_ID="1"
 SENTRY_DSN=""
+POSTHOG_KEY=""
 
 # --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
@@ -53,6 +57,7 @@ while [[ $# -gt 0 ]]; do
     --environment)  ENVIRONMENT="$2";  shift 2 ;;
     --shard-id)     SHARD_ID="$2";     shift 2 ;;
     --sentry-dsn)   SENTRY_DSN="$2";   shift 2 ;;
+    --posthog-key)  POSTHOG_KEY="$2";  shift 2 ;;
     --help|-h)
       echo "Usage: sudo $0 --persona-id <id> --phone <E.164> --edge-secret <secret> [--shard-id <n>]"
       echo ""
@@ -67,6 +72,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --environment   production or development (default: production)"
       echo "  --shard-id      Numeric shard suffix for user/agent naming (default: 1)"
       echo "  --sentry-dsn    Sentry DSN for edge runtime error tracking (optional)"
+      echo "  --posthog-key   PostHog project API key for analytics and feature flags"
       exit 0
       ;;
     *) log_error "Unknown option: $1"; exit 1 ;;
@@ -120,6 +126,19 @@ for cmd in node npm git; do
   fi
 done
 
+# --- Environment-aware defaults ---
+BACKEND_URL_WAS_EXPLICIT=false
+# Check if --backend-url was explicitly provided by seeing if it differs from default
+# (We set this flag during parsing above, but as a simpler approach, override for dev)
+if [[ "$ENVIRONMENT" == "development" && "$BACKEND_URL" == "https://api.ikiro.ai" ]]; then
+  BACKEND_URL="https://api-dev.ikiro.ai"
+  log_info "Development environment: auto-set backend URL to ${BACKEND_URL}"
+fi
+DEV_ENABLED="false"
+if [[ "$ENVIRONMENT" == "development" ]]; then
+  DEV_ENABLED="true"
+fi
+
 # --- Derived values ---
 MAC_USER="${PERSONA_ID}${SHARD_ID}"
 USER_HOME="/Users/${MAC_USER}"
@@ -138,6 +157,11 @@ if [[ -n "${SENTRY_DSN}" ]]; then
   echo "  Sentry:       enabled"
 else
   echo "  Sentry:       disabled"
+fi
+if [[ -n "${POSTHOG_KEY}" ]]; then
+  echo "  PostHog:      enabled"
+else
+  echo "  PostHog:      disabled"
 fi
 echo ""
 
@@ -267,7 +291,7 @@ edge:
   agent_id: "${MAC_USER}"
   user_phone: "${PHONE}"
   persona_id: "${PERSONA_ID}"
-
+$([ "$DEV_ENABLED" = "true" ] && printf "\ndev:\n  enabled: true\n")
 backend:
   url: "${BACKEND_URL}"
   websocket_url: "${WEBSOCKET_URL}"
@@ -303,10 +327,14 @@ monitoring:
     enabled: ${SENTRY_ENABLED}
     dsn: "${SENTRY_DSN}"
     environment: "${ENVIRONMENT}"
-  amplitude:
-    enabled: true
-    api_key: "\${AMPLITUDE_API_KEY}"
+    traces_sample_rate: 0.1
+    profiles_sample_rate: 0.1
+  posthog:
+    enabled: $([ -n "$POSTHOG_KEY" ] && echo "true" || echo "false")
+$([ -n "$POSTHOG_KEY" ] && echo "    api_key: \"${POSTHOG_KEY}\"" || echo "    # api_key: not configured")
+    host: "https://us.i.posthog.com"
     flush_interval_ms: 10000
+    feature_flags_enabled: true
   health_check:
     enabled: true
     port: ${HEALTH_PORT}
@@ -486,6 +514,24 @@ chmod 600 "$PORT_REGISTRY"
 log_done "Port registry updated"
 
 # =============================================================================
+# Step 10: Configure log rotation (newsyslog)
+# =============================================================================
+log_step "Configuring log rotation"
+
+NEWSYSLOG_CONF="/etc/newsyslog.d/archety-edge-${PERSONA_ID}.conf"
+
+cat > "$NEWSYSLOG_CONF" << LOGCONF
+# Archety Edge Agent log rotation: ${PERSONA_ID}
+# Rotates at 10MB, keeps 7 compressed backups
+# logfilename                                                          [owner:group]  mode  count  size  when  flags
+${PROJECT_DIR}/logs/edge-agent.out.log                                 ${MAC_USER}:staff  644  7  10000  *  GZ
+${PROJECT_DIR}/logs/edge-agent.err.log                                 ${MAC_USER}:staff  644  7  10000  *  GZ
+${PROJECT_DIR}/edge-agent.log                                          ${MAC_USER}:staff  644  7  10000  *  GZ
+LOGCONF
+
+log_done "Log rotation configured: ${NEWSYSLOG_CONF}"
+
+# =============================================================================
 # Done — Print manual steps
 # =============================================================================
 echo ""
@@ -496,8 +542,19 @@ log_done "macOS user '${MAC_USER}' ready"
 log_done "Repo at ${PROJECT_DIR}"
 log_done "Dependencies installed and built"
 log_done "config.yaml generated (health: ${HEALTH_PORT}, admin: ${ADMIN_PORT})"
+if [[ -n "$SENTRY_DSN" ]]; then
+  log_done "Sentry error tracking: enabled"
+else
+  log_warn "Sentry: disabled (pass --sentry-dsn to enable)"
+fi
+if [[ -n "$POSTHOG_KEY" ]]; then
+  log_done "PostHog analytics: enabled"
+else
+  log_warn "PostHog: disabled (pass --posthog-key to enable)"
+fi
 log_done ".env generated"
 log_done "LaunchAgent installed: ${PLIST_LABEL}"
+log_done "Log rotation configured"
 echo ""
 echo -e "${YELLOW}${BOLD}MANUAL STEPS REQUIRED:${NC}"
 echo ""

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { ILogger } from '../interfaces/ILogger';
 import { IMessageTransport } from '../interfaces/IMessageTransport';
-import { AmplitudeAnalytics } from '../monitoring/amplitude';
+import { PostHogAnalytics } from '../monitoring/posthog';
 
 /**
  * Scheduled message interface
@@ -37,7 +37,7 @@ export class Scheduler {
   private db: Database.Database;
   private logger: ILogger;
   private transport: IMessageTransport;
-  private amplitude: AmplitudeAnalytics | null = null;
+  private posthog: PostHogAnalytics | null = null;
   private checkInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private adaptiveMode: boolean = true; // Phase 3: Adaptive scheduling
@@ -49,11 +49,11 @@ export class Scheduler {
     dbPath: string,
     transport: IMessageTransport,
     logger: ILogger,
-    amplitude?: AmplitudeAnalytics
+    posthog?: PostHogAnalytics
   ) {
     this.logger = logger;
     this.transport = transport;
-    this.amplitude = amplitude || null;
+    this.posthog = posthog || null;
 
     // Initialize database
     this.db = new Database(dbPath);
@@ -128,8 +128,8 @@ export class Scheduler {
     this.logger.info(`Scheduled message ${id} for ${sendAt.toISOString()}`);
 
     // Track scheduled message
-    if (this.amplitude) {
-      this.amplitude.trackScheduledMessage(sendAt.toISOString(), true);
+    if (this.posthog) {
+      this.posthog.trackScheduledMessage('scheduled', { sendAt: sendAt.toISOString() });
     }
 
     // Reschedule next check if in adaptive mode and scheduler is running
@@ -449,14 +449,13 @@ export class Scheduler {
       );
 
       // Track scheduled message execution
-      if (this.amplitude) {
-        this.amplitude.trackScheduledMessageExecuted(
-          parseInt(message.id.replace(/-/g, '').substring(0, 8), 16), // Simple numeric ID from UUID
-          scheduledTime.toISOString(),
-          actualTime.toISOString(),
+      if (this.posthog) {
+        this.posthog.trackScheduledMessage(success ? 'executed' : 'failed', {
+          scheduledTime: scheduledTime.toISOString(),
+          actualTime: actualTime.toISOString(),
           latencyMs,
-          success
-        );
+          success,
+        });
       }
 
       if (success) {
@@ -489,14 +488,13 @@ export class Scheduler {
       }
     } catch (error: any) {
       // Track failed execution
-      if (this.amplitude) {
-        this.amplitude.trackScheduledMessageExecuted(
-          parseInt(message.id.replace(/-/g, '').substring(0, 8), 16),
-          scheduledTime.toISOString(),
-          actualTime.toISOString(),
+      if (this.posthog) {
+        this.posthog.trackScheduledMessage('failed', {
+          scheduledTime: scheduledTime.toISOString(),
+          actualTime: actualTime.toISOString(),
           latencyMs,
-          false
-        );
+          success: false,
+        });
       }
 
       // Mark as failed with error

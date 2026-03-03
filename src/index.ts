@@ -17,7 +17,7 @@ import { CommandHandler } from './commands/CommandHandler';
 import { RuleEngine } from './rules/RuleEngine';
 import { PlanManager } from './plans/PlanManager';
 import { SentryMonitoring } from './monitoring/sentry';
-import { AmplitudeAnalytics } from './monitoring/amplitude';
+import { PostHogAnalytics } from './monitoring/posthog';
 import { HealthCheckServer } from './monitoring/health';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -42,7 +42,7 @@ class EdgeAgent {
   private config: Config;
   private logger: Logger;
   private sentry: SentryMonitoring;
-  private amplitude: AmplitudeAnalytics;
+  private posthog: PostHogAnalytics;
   private healthCheck: HealthCheckServer;
   private transport: IMessageTransport;
   private backend: RailwayClient;
@@ -80,7 +80,7 @@ class EdgeAgent {
 
     // Initialize monitoring
     this.sentry = new SentryMonitoring(this.config, this.logger);
-    this.amplitude = new AmplitudeAnalytics(this.config, this.logger);
+    this.posthog = new PostHogAnalytics(this.config, this.logger);
     this.healthCheck = new HealthCheckServer(this.config, this.logger);
 
     const attachmentsPath =
@@ -112,7 +112,7 @@ class EdgeAgent {
 
     // Initialize scheduler
     const dbPath = this.config.database?.path || './data/scheduler.db';
-    this.scheduler = new Scheduler(dbPath, this.transport, this.logger, this.amplitude);
+    this.scheduler = new Scheduler(dbPath, this.transport, this.logger, this.posthog);
 
     // Set up scheduler acknowledgment callback for scheduled message execution
     this.scheduler.onAck((commandId, status, options) => {
@@ -165,7 +165,7 @@ class EdgeAgent {
       this.healthCheck.setWebSocketConnected(true);
 
       // Track WebSocket connection
-      this.amplitude.trackWebSocketStatus('connected');
+      this.posthog.trackWebSocketStatus('connected');
 
       // Reduce or stop HTTP polling when WebSocket is connected
       if (this.syncInterval) {
@@ -180,7 +180,7 @@ class EdgeAgent {
       this.healthCheck.setWebSocketConnected(false);
 
       // Track WebSocket disconnection
-      this.amplitude.trackWebSocketStatus('disconnected');
+      this.posthog.trackWebSocketStatus('disconnected');
 
       // Resume HTTP polling as fallback
       if (!this.syncInterval && this.isRunning) {
@@ -252,8 +252,13 @@ class EdgeAgent {
 
       // Initialize monitoring
       this.sentry.initialize();
-      this.amplitude.initialize();
+      this.posthog.initialize();
       this.healthCheck.start();
+
+      // Apply feature flag overrides (if PostHog flags are enabled)
+      if (this.config.monitoring?.posthog?.feature_flags_enabled) {
+        await this.applyFeatureFlagOverrides();
+      }
 
       // Register with backend
       this.logger.info('Registering with backend...');
@@ -299,7 +304,7 @@ class EdgeAgent {
         } else {
           this.logger.warn('⚠️  WebSocket connection failed - falling back to HTTP polling');
           // Track WebSocket connection failure
-          this.amplitude.trackWebSocketStatus('failed', 'Initial connection failed');
+          this.posthog.trackWebSocketStatus('failed', 'Initial connection failed');
           this.startSyncLoop();
         }
       } else {
@@ -380,11 +385,9 @@ class EdgeAgent {
       this.logger.info('='.repeat(60));
 
       // Track message received
-      this.amplitude.trackMessageReceived(
-        message.threadId,
-        message.isGroup,
-        (message.attachments?.length ?? 0) > 0
-      );
+      this.posthog.trackMessageRelayed('inbound', message.threadId, message.isGroup, {
+        hasAttachments: (message.attachments?.length ?? 0) > 0,
+      });
 
       // Filter out messages from the edge client's own phone number to prevent loops
       if (message.sender === this.config.edge.user_phone) {
@@ -424,7 +427,8 @@ class EdgeAgent {
         text: filteredText,                               // Message text
         timestamp: Math.floor(message.timestamp.getTime() / 1000), // Unix timestamp
         participants: message.participants,
-        persona_id: 'sage',                               // Sage persona for this edge node
+        persona_id: this.config.edge.persona_id,             // Persona for this edge node (from config)
+        persona_phone: this.config.edge.user_phone,          // This persona's iMessage phone number
         metadata: {
           was_redacted: false,
           redacted_fields: [],
@@ -465,12 +469,10 @@ class EdgeAgent {
           );
 
           // Track reflex message sent
-          this.amplitude.trackMessageSent(
-            message.threadId,
-            message.isGroup,
-            'reflex',
-            reflexSent
-          );
+          this.posthog.trackMessageRelayed('outbound', message.threadId, message.isGroup, {
+            bubbleType: 'reflex',
+            success: reflexSent,
+          });
 
           if (reflexSent) {
             this.logger.info('✅ Reflex message DELIVERED to iMessage');
@@ -499,12 +501,10 @@ class EdgeAgent {
               );
 
               // Track burst messages sent
-              this.amplitude.trackMessageSent(
-                message.threadId,
-                message.isGroup,
-                'burst',
-                burstSent
-              );
+              this.posthog.trackMessageRelayed('outbound', message.threadId, message.isGroup, {
+                bubbleType: 'burst',
+                success: burstSent,
+              });
 
               if (burstSent) {
                 this.logger.info('✅ All burst messages DELIVERED to iMessage');
@@ -530,12 +530,10 @@ class EdgeAgent {
           );
 
           // Track multi-bubble message sent
-          this.amplitude.trackMessageSent(
-            message.threadId,
-            message.isGroup,
-            'multi',
-            sent
-          );
+          this.posthog.trackMessageRelayed('outbound', message.threadId, message.isGroup, {
+            bubbleType: 'multi',
+            success: sent,
+          });
 
           if (sent) {
             this.logger.info('✅ All bubbles DELIVERED to iMessage');
@@ -557,12 +555,10 @@ class EdgeAgent {
           );
 
           // Track single message sent
-          this.amplitude.trackMessageSent(
-            message.threadId,
-            message.isGroup,
-            'single',
-            sent
-          );
+          this.posthog.trackMessageRelayed('outbound', message.threadId, message.isGroup, {
+            bubbleType: 'single',
+            success: sent,
+          });
 
           if (sent) {
             this.logger.info('✅ Response DELIVERED to iMessage');
@@ -577,7 +573,7 @@ class EdgeAgent {
       this.logger.error('Error processing message:', error.message);
 
       // Track error
-      this.amplitude.trackError(
+      this.posthog.trackError(
         'message_processing',
         error.message,
         {
@@ -677,7 +673,7 @@ class EdgeAgent {
 
         // Track command execution
         const durationMs = Date.now() - commandStartTime;
-        this.amplitude.trackCommandProcessed(command.command_type, retryResult.success, durationMs);
+        this.posthog.trackCommandProcessed(command.command_type, retryResult.success, durationMs);
         return;
       }
 
@@ -687,7 +683,7 @@ class EdgeAgent {
 
         // Track command execution
         const durationMs = Date.now() - commandStartTime;
-        this.amplitude.trackCommandProcessed(command.command_type, eventResult.success, durationMs);
+        this.posthog.trackCommandProcessed(command.command_type, eventResult.success, durationMs);
         return;
       }
 
@@ -701,7 +697,7 @@ class EdgeAgent {
 
       // Track command execution
       const durationMs = Date.now() - commandStartTime;
-      this.amplitude.trackCommandProcessed(command.command_type, result.success, durationMs);
+      this.posthog.trackCommandProcessed(command.command_type, result.success, durationMs);
 
       if (result.success) {
         this.logger.info(`✅ Command ${command.command_id} executed successfully`);
@@ -714,8 +710,8 @@ class EdgeAgent {
 
       // Track command error
       const durationMs = Date.now() - commandStartTime;
-      this.amplitude.trackCommandProcessed(command.command_type, false, durationMs);
-      this.amplitude.trackError(
+      this.posthog.trackCommandProcessed(command.command_type, false, durationMs);
+      this.posthog.trackError(
         'command_processing',
         error.message,
         {
@@ -788,6 +784,46 @@ class EdgeAgent {
         clearInterval(this.syncInterval);
         this.startSyncLoop();
       }
+    }
+  }
+
+  /**
+   * Apply feature flag overrides from PostHog.
+   * Allows remote configuration of persona, poll interval, WebSocket, and adaptive scheduling.
+   */
+  private async applyFeatureFlagOverrides(): Promise<void> {
+    try {
+      // Override persona_id from PostHog
+      const personaOverride = await this.posthog.getConfig<string>('edge-persona-id', '');
+      if (personaOverride && personaOverride !== this.config.edge.persona_id) {
+        this.logger.info(`Feature flag override: persona_id ${this.config.edge.persona_id} → ${personaOverride}`);
+        this.config.edge.persona_id = personaOverride;
+      }
+
+      // Override iMessage poll interval
+      const pollOverride = await this.posthog.getConfig<number>('edge-poll-interval', 0);
+      if (pollOverride > 0 && pollOverride !== this.config.imessage.poll_interval_seconds) {
+        this.logger.info(`Feature flag override: poll_interval ${this.config.imessage.poll_interval_seconds}s → ${pollOverride}s`);
+        this.config.imessage.poll_interval_seconds = pollOverride;
+      }
+
+      // Override WebSocket enabled/disabled
+      const wsEnabled = await this.posthog.getFlag('edge-websocket-enabled', true);
+      if (wsEnabled !== this.useWebSocket) {
+        this.logger.info(`Feature flag override: websocket ${this.useWebSocket} → ${wsEnabled}`);
+        this.useWebSocket = wsEnabled;
+      }
+
+      // Override adaptive scheduling
+      const adaptiveEnabled = await this.posthog.getFlag('edge-adaptive-scheduling', true);
+      if (this.config.scheduler) {
+        if (adaptiveEnabled !== (this.config.scheduler.adaptive_mode ?? true)) {
+          this.logger.info(`Feature flag override: adaptive_mode → ${adaptiveEnabled}`);
+          this.config.scheduler.adaptive_mode = adaptiveEnabled;
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Failed to apply feature flag overrides (using defaults):', error);
     }
   }
 
@@ -875,12 +911,11 @@ class EdgeAgent {
         const uploadStartTime = Date.now();
 
         // Track photo upload started
-        this.amplitude.trackPhotoUploadStarted(
-          item.attachment.guid,
-          item.mimeType || 'unknown',
-          item.sizeBytes ?? 0,
-          message.threadId
-        );
+        this.posthog.trackPhotoUpload('started', item.attachment.guid, {
+          mimeType: item.mimeType || 'unknown',
+          sizeBytes: item.sizeBytes ?? 0,
+          threadId: message.threadId,
+        });
 
         try {
           // Extract caption from message text (if photo has accompanying text)
@@ -903,13 +938,11 @@ class EdgeAgent {
           const uploadDurationMs = Date.now() - uploadStartTime;
 
           // Track photo upload completed
-          this.amplitude.trackPhotoUploadCompleted(
-            item.attachment.guid,
-            uploadResponse.photo_id,
-            item.sizeBytes ?? 0,
+          this.posthog.trackPhotoUpload('completed', item.attachment.guid, {
+            photoId: uploadResponse.photo_id,
+            sizeBytes: item.sizeBytes ?? 0,
             uploadDurationMs,
-            false // transcoded flag - would need to track from AttachmentProcessor
-          );
+          });
 
           summary.uploaded_photo_id = uploadResponse.photo_id;
           this.attachmentCache.markUploaded(item.attachment.guid, uploadResponse.photo_id);
@@ -923,11 +956,10 @@ class EdgeAgent {
           }
         } catch (error: any) {
           // Track photo upload failed
-          this.amplitude.trackPhotoUploadFailed(
-            item.attachment.guid,
-            error.message,
-            item.sizeBytes ?? 0
-          );
+          this.posthog.trackPhotoUpload('failed', item.attachment.guid, {
+            errorReason: error.message,
+            sizeBytes: item.sizeBytes ?? 0,
+          });
 
           summary.skipped = true;
           summary.skip_reason = 'upload_failed';
@@ -1058,7 +1090,7 @@ class EdgeAgent {
 
     // Flush monitoring events before shutdown
     await this.sentry.flush();
-    await this.amplitude.flush();
+    await this.posthog.flush();
 
     // MEMORY LEAK FIX: Clear all tracked intervals
     this.activeIntervals.forEach(interval => {
@@ -1087,9 +1119,32 @@ class EdgeAgent {
     // Close monitoring
     this.healthCheck.stop();
     await this.sentry.close();
-    await this.amplitude.shutdown();
+    await this.posthog.shutdown();
 
     this.logger.info('✅ Edge Agent stopped (cleaned up all timers)');
+  }
+
+  // ====================
+  // Dev Mode API
+  // ====================
+
+  /**
+   * Switch the active persona at runtime (dev mode only).
+   * Only changes the persona_id tag on outbound requests — no WebSocket reconnection needed.
+   */
+  public switchPersona(personaId: string): { previous: string; current: string } {
+    const previous = this.config.edge.persona_id;
+    this.config.edge.persona_id = personaId;
+    this.logger.info(`Persona switched: ${previous} → ${personaId}`);
+    return { previous, current: personaId };
+  }
+
+  public getPersonaId(): string {
+    return this.config.edge.persona_id;
+  }
+
+  public isDevMode(): boolean {
+    return this.config.dev?.enabled === true;
   }
 
   // ====================

@@ -39,7 +39,14 @@ monitoring:
     enabled: true
     dsn: "https://0708b82c4f7853f3e0f94e2bda698706@o4510292155957248.ingest.us.sentry.io/4510906580729856"
     environment: "production"
+    traces_sample_rate: 0.1  # 10% of transactions for performance monitoring
+    profiles_sample_rate: 0.1  # 10% profiling
+  posthog:
+    enabled: true  # Set to true and add API key to enable analytics
+    api_key: "${POSTHOG_API_KEY}"  # Set via environment variable
+    host: "https://us.i.posthog.com"
     flush_interval_ms: 10000  # Flush events every 10 seconds
+    feature_flags_enabled: true  # Enable remote feature flag evaluation
   health_check:
     enabled: true  # Enable health check endpoint
     port: 3001  # Health check HTTP server port
