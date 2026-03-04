@@ -30,7 +30,7 @@ node --version  # Should be v18.0.0 or higher
 ### 2. Install Project Dependencies
 
 ```bash
-cd /Users/sage1/Code/edge-relay
+cd /Users/luna1/Code/edge-relay
 npm install
 ```
 

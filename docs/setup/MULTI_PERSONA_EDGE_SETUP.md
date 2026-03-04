@@ -1,6 +1,6 @@
 # Multi-Persona Edge Agent Setup Guide
 
-**Goal:** Run 4-6 AI companion personas (Sage, Vex, Echo, Kael, + future characters) on a single Mac mini M4 16GB, each with its own phone number and iMessage account.
+**Goal:** Run 4-6 AI companion personas (Luna, Nyx, Echo, Kael, + future characters) on a single Mac mini M4 16GB, each with its own phone number and iMessage account.
 
 **Status:** Validation guide — follow these steps to confirm feasibility before provisioning production personas.
 
@@ -12,7 +12,7 @@ Use `setup-persona.sh` to provision a new persona in one command:
 
 ```bash
 sudo ./setup-persona.sh \
-  --persona-id vex \
+  --persona-id nyx \
   --phone "+14155559876" \
   --edge-secret "your_shared_secret"
 ```
@@ -23,9 +23,12 @@ This automates: macOS user creation, repo clone, dependency install, build, conf
 
 | Script | Purpose |
 |--------|---------|
+| `bootstrap-mac.sh` | Prepare a fresh Mac mini (install prereqs, configure OS settings) |
 | `setup-persona.sh` | Provision a new persona (one command) |
 | `teardown-persona.sh` | Remove a persona (`--delete-user` to also remove macOS account) |
 | `list-personas.sh` | Show all personas with health status |
+| `update-all-personas.sh` | Pull, build, and restart all personas (fleet update) |
+| `backup-databases.sh` | Back up SQLite databases for all personas (cron-friendly) |
 
 After running `setup-persona.sh`, follow the printed manual checklist (Fast User Switching login, iMessage sign-in, macOS permissions). The sections below document each step in detail for reference and troubleshooting.
 
@@ -53,8 +56,8 @@ Apple restricts iMessage to **one phone number per macOS user account**. Each pe
 
 ```
 Mac mini M4 16GB
-├── sage1 (macOS user) ─── Edge Agent (port 3001/3100) ─── +1xxxSAGE
-├── vex1  (macOS user) ─── Edge Agent (port 3002/3101) ─── +1xxxVEX
+├── luna1 (macOS user) ─── Edge Agent (port 3001/3100) ─── +1xxxLUNA
+├── nyx1  (macOS user) ─── Edge Agent (port 3002/3101) ─── +1xxxNYX
 ├── echo1 (macOS user) ─── Edge Agent (port 3003/3102) ─── +1xxxECHO
 ├── kael1 (macOS user) ─── Edge Agent (port 3004/3103) ─── +1xxxKAEL
 ├── char5 (macOS user) ─── Edge Agent (port 3005/3104) ─── +1xxxCHAR5
@@ -65,17 +68,17 @@ Mac mini M4 16GB
 
 ## Phase 1: Create macOS User Accounts
 
-Start with 2 test accounts (beyond your existing `sage1`), then scale up.
+Start with 2 test accounts (beyond your existing `luna1`), then scale up.
 
 ### 1.1 Create accounts
 
 ```bash
 # Create test persona accounts (run as admin)
-sudo sysadminctl -addUser vex1 -fullName "Vex Agent" -password "<secure-password>" -admin
+sudo sysadminctl -addUser nyx1 -fullName "Nyx Agent" -password "<secure-password>" -admin
 sudo sysadminctl -addUser echo1 -fullName "Echo Agent" -password "<secure-password>" -admin
 
 # Verify accounts exist
-dscl . -list /Users | grep -E "sage1|vex1|echo1"
+dscl . -list /Users | grep -E "luna1|nyx1|echo1"
 ```
 
 ### 1.2 Configure auto-login prevention workaround
@@ -135,7 +138,7 @@ who | wc -l
 ```bash
 # Test AppleScript access for each user
 # NOTE: This may require TCC/Automation permission grants on first run
-sudo -u vex1 osascript -e 'tell application "Messages" to get name'
+sudo -u nyx1 osascript -e 'tell application "Messages" to get name'
 sudo -u echo1 osascript -e 'tell application "Messages" to get name'
 
 # Expected output: "Messages"
@@ -146,11 +149,11 @@ sudo -u echo1 osascript -e 'tell application "Messages" to get name'
 
 ```bash
 # Check that Messages has created the database for each user
-sudo ls -la /Users/vex1/Library/Messages/chat.db
+sudo ls -la /Users/nyx1/Library/Messages/chat.db
 sudo ls -la /Users/echo1/Library/Messages/chat.db
 
 # Test that the database has content
-sudo -u vex1 sqlite3 /Users/vex1/Library/Messages/chat.db "SELECT COUNT(*) FROM message;" 2>/dev/null
+sudo -u nyx1 sqlite3 /Users/nyx1/Library/Messages/chat.db "SELECT COUNT(*) FROM message;" 2>/dev/null
 sudo -u echo1 sqlite3 /Users/echo1/Library/Messages/chat.db "SELECT COUNT(*) FROM message;" 2>/dev/null
 ```
 
@@ -162,11 +165,11 @@ sudo -u echo1 sqlite3 /Users/echo1/Library/Messages/chat.db "SELECT COUNT(*) FRO
 
 ```bash
 # Clone archety-edge for each persona user
-sudo -u vex1 git clone <repo-url> /Users/vex1/Code/archety-edge
+sudo -u nyx1 git clone <repo-url> /Users/nyx1/Code/archety-edge
 sudo -u echo1 git clone <repo-url> /Users/echo1/Code/archety-edge
 
 # Install dependencies for each
-sudo -u vex1 bash -c "cd /Users/vex1/Code/archety-edge && npm install && npm run build"
+sudo -u nyx1 bash -c "cd /Users/nyx1/Code/archety-edge && npm install && npm run build"
 sudo -u echo1 bash -c "cd /Users/echo1/Code/archety-edge && npm install && npm run build"
 ```
 
@@ -174,13 +177,13 @@ sudo -u echo1 bash -c "cd /Users/echo1/Code/archety-edge && npm install && npm r
 
 Each persona gets its own config with unique `agent_id`, `persona_id`, `user_phone`, paths, and ports.
 
-**Example: `/Users/vex1/Code/archety-edge/config.yaml`**
+**Example: `/Users/nyx1/Code/archety-edge/config.yaml`**
 
 ```yaml
 edge:
-  agent_id: "vex1"
-  user_phone: "+1XXXXXXXXXX"    # Vex's iMessage phone number
-  persona_id: "vex"
+  agent_id: "nyx1"
+  user_phone: "+1XXXXXXXXXX"    # Nyx's iMessage phone number
+  persona_id: "nyx"
 
 backend:
   url: "https://api.ikiro.ai"
@@ -194,8 +197,8 @@ websocket:
 
 imessage:
   poll_interval_seconds: 2       # Use 2s for non-primary personas
-  db_path: "/Users/vex1/Library/Messages/chat.db"
-  attachments_path: "/Users/vex1/Library/Messages/Attachments"
+  db_path: "/Users/nyx1/Library/Messages/chat.db"
+  attachments_path: "/Users/nyx1/Library/Messages/Attachments"
   transport_mode: "native_helper"
   bridge_executable: "./native/messages-helper/.build/release/messages-helper"
   bridge_args: []
@@ -221,16 +224,16 @@ monitoring:
     flush_interval_ms: 10000
   health_check:
     enabled: true
-    port: 3002                   # UNIQUE per persona: sage=3001, vex=3002, echo=3003, etc.
+    port: 3002                   # UNIQUE per persona: luna=3001, nyx=3002, echo=3003, etc.
 
 security:
-  keychain_service: "com.archety.edge.vex"   # UNIQUE per persona
+  keychain_service: "com.archety.edge.nyx"   # UNIQUE per persona
   keychain_account: "edge-state"
 ```
 
 ### 3.3 Create per-persona .env file
 
-**Example: `/Users/vex1/Code/archety-edge/.env`**
+**Example: `/Users/nyx1/Code/archety-edge/.env`**
 
 ```bash
 EDGE_SECRET=<shared-edge-secret>
@@ -242,7 +245,7 @@ AMPLITUDE_API_KEY=<amplitude-key>
 ### 3.4 Build the native Swift helper per-user
 
 ```bash
-sudo -u vex1 bash -c "cd /Users/vex1/Code/archety-edge/native/messages-helper && swift build -c release"
+sudo -u nyx1 bash -c "cd /Users/nyx1/Code/archety-edge/native/messages-helper && swift build -c release"
 ```
 
 ### 3.5 Grant macOS permissions per-user
@@ -270,7 +273,7 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
 
 ### 4.1 Create per-persona plist
 
-**Example: `/Library/LaunchDaemons/com.archety.edge-vex.plist`**
+**Example: `/Library/LaunchDaemons/com.archety.edge-nyx.plist`**
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -279,19 +282,19 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.archety.edge-vex</string>
+    <string>com.archety.edge-nyx</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/node</string>
-        <string>/Users/vex1/Code/archety-edge/dist/admin-portal/server/index.js</string>
+        <string>/Users/nyx1/Code/archety-edge/dist/admin-portal/server/index.js</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/vex1/Code/archety-edge</string>
+    <string>/Users/nyx1/Code/archety-edge</string>
 
     <key>UserName</key>
-    <string>vex1</string>
+    <string>nyx1</string>
 
     <key>RunAtLoad</key>
     <true/>
@@ -303,10 +306,10 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>/Users/vex1/Code/archety-edge/logs/edge-agent.out.log</string>
+    <string>/Users/nyx1/Code/archety-edge/logs/edge-agent.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/vex1/Code/archety-edge/logs/edge-agent.err.log</string>
+    <string>/Users/nyx1/Code/archety-edge/logs/edge-agent.err.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>
@@ -315,7 +318,7 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
         <key>NODE_ENV</key>
         <string>production</string>
         <key>HOME</key>
-        <string>/Users/vex1</string>
+        <string>/Users/nyx1</string>
     </dict>
 
     <key>ProcessType</key>
@@ -328,12 +331,12 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
 
 ```bash
 # Copy plist (repeat for each persona)
-sudo cp com.archety.edge-vex.plist /Library/LaunchDaemons/
-sudo chown root:wheel /Library/LaunchDaemons/com.archety.edge-vex.plist
-sudo chmod 644 /Library/LaunchDaemons/com.archety.edge-vex.plist
+sudo cp com.archety.edge-nyx.plist /Library/LaunchDaemons/
+sudo chown root:wheel /Library/LaunchDaemons/com.archety.edge-nyx.plist
+sudo chmod 644 /Library/LaunchDaemons/com.archety.edge-nyx.plist
 
 # Load the daemon
-sudo launchctl load /Library/LaunchDaemons/com.archety.edge-vex.plist
+sudo launchctl load /Library/LaunchDaemons/com.archety.edge-nyx.plist
 
 # Verify it's running
 sudo launchctl list | grep archety
@@ -353,8 +356,8 @@ ps aux | grep "node.*archety-edge" | grep -v grep
 sudo launchctl list | grep archety
 
 # Hit each health endpoint
-curl -s http://localhost:3001/health  # sage
-curl -s http://localhost:3002/health  # vex
+curl -s http://localhost:3001/health  # luna
+curl -s http://localhost:3002/health  # nyx
 curl -s http://localhost:3003/health  # echo
 curl -s http://localhost:3004/health  # kael
 ```
@@ -370,15 +373,15 @@ From a separate phone/device, send an iMessage to each persona's phone number. V
 
 ```bash
 # Monitor logs in parallel (open separate terminal tabs)
-tail -f /Users/sage1/Code/archety-edge/logs/edge-agent.out.log
-tail -f /Users/vex1/Code/archety-edge/logs/edge-agent.out.log
+tail -f /Users/luna1/Code/archety-edge/logs/edge-agent.out.log
+tail -f /Users/nyx1/Code/archety-edge/logs/edge-agent.out.log
 tail -f /Users/echo1/Code/archety-edge/logs/edge-agent.out.log
 ```
 
 ### 5.3 Verify no cross-contamination
 
-- Send "What's my name?" to Sage after telling Sage your name → should remember
-- Send "What's my name?" to Vex (never told Vex) → should NOT know your name
+- Send "What's my name?" to Luna after telling Luna your name → should remember
+- Send "What's my name?" to Nyx (never told Nyx) → should NOT know your name
 - This validates per-persona memory namespace isolation
 
 ---
@@ -390,7 +393,7 @@ This is the key data collection to determine scaling limits.
 ### 6.1 Baseline (before adding personas)
 
 ```bash
-# Record baseline with only sage1 running
+# Record baseline with only luna1 running
 echo "=== BASELINE: 1 persona ==="
 memory_pressure
 vm_stat | head -5
@@ -446,8 +449,8 @@ Fill in this table with your actual measurements:
 
 | Personas Running | memory_pressure | Total Node RSS | Total loginwindow RSS | Free RAM | Notes |
 |-----------------|-----------------|----------------|----------------------|----------|-------|
-| 1 (sage) | | | | | Baseline |
-| 2 (+vex) | | | | | |
+| 1 (luna) | | | | | Baseline |
+| 2 (+nyx) | | | | | |
 | 3 (+echo) | | | | | |
 | 4 (+kael) | | | | | |
 | 5 (+char5) | | | | | |
@@ -520,7 +523,7 @@ The biggest operational pain point: after every reboot, someone must log into ea
 
 ```bash
 # Check if the user has an active GUI session
-who | grep vex1
+who | grep nyx1
 
 # If missing, log into vex1 via Fast User Switching, then switch back
 ```
@@ -544,7 +547,7 @@ who | grep vex1
 lsof -i :3002
 
 # Fix: Update the port in that persona's config.yaml and restart
-sudo launchctl kickstart -k system/com.archety.edge-vex
+sudo launchctl kickstart -k system/com.archety.edge-nyx
 ```
 
 ### macOS logs out inactive users
@@ -568,10 +571,10 @@ caffeinate -s &
 
 ```bash
 # Option A: Build per-user
-sudo -u vex1 bash -c "cd /Users/vex1/Code/archety-edge/native/messages-helper && swift build -c release"
+sudo -u nyx1 bash -c "cd /Users/nyx1/Code/archety-edge/native/messages-helper && swift build -c release"
 
 # Option B: Share one binary but ensure read+execute permissions
-chmod 755 /Users/sage1/Code/archety-edge/native/messages-helper/.build/release/messages-helper
+chmod 755 /Users/luna1/Code/archety-edge/native/messages-helper/.build/release/messages-helper
 ```
 
 ---
@@ -580,8 +583,8 @@ chmod 755 /Users/sage1/Code/archety-edge/native/messages-helper/.build/release/m
 
 | Persona | macOS User | Health Port | Admin Port | LaunchDaemon Label |
 |---------|-----------|-------------|------------|-------------------|
-| Sage | sage1 | 3001 | 3100 | com.archety.edge-sage |
-| Vex | vex1 | 3002 | 3101 | com.archety.edge-vex |
+| Luna | luna1 | 3001 | 3100 | com.archety.edge-luna |
+| Nyx | nyx1 | 3002 | 3101 | com.archety.edge-nyx |
 | Echo | echo1 | 3003 | 3102 | com.archety.edge-echo |
 | Kael | kael1 | 3004 | 3103 | com.archety.edge-kael |
 | Char 5 | char5 | 3005 | 3104 | com.archety.edge-char5 |
@@ -603,6 +606,166 @@ chmod 755 /Users/sage1/Code/archety-edge/native/messages-helper/.build/release/m
 | **Remaining headroom** | — | **~9.8 GB** | **~8.8 GB** |
 
 These are estimates — the measurements from Phase 6 will give you real numbers.
+
+---
+
+## Bootstrap: Fresh Mac Mini Setup
+
+Before provisioning any personas, run `bootstrap-mac.sh` to prepare the Mac mini:
+
+```bash
+sudo ./bootstrap-mac.sh
+```
+
+This installs and configures:
+- Xcode Command Line Tools
+- Homebrew + Node.js + Git
+- SSH (Remote Login) and Screen Sharing
+- Disables sleep, auto-logout, and App Nap
+- Enables Fast User Switching
+- Creates port registry directory
+
+Idempotent — safe to re-run. Skips already-installed components.
+
+---
+
+## Fleet Updates: Updating All Personas
+
+When you push new code, update all running personas at once:
+
+```bash
+sudo ./update-all-personas.sh
+```
+
+This sequentially (never all down at once):
+1. `git pull --ff-only` per persona
+2. `npm install` only if `package-lock.json` changed
+3. `npm run admin:build`
+4. Rebuilds Swift helper only if `native/messages-helper/Sources/` changed
+5. Restarts the LaunchDaemon
+6. Verifies `/health` returns 200
+
+Use `--force-build` to skip change detection and rebuild everything.
+
+---
+
+## Database Backups
+
+Back up all persona SQLite databases:
+
+```bash
+sudo ./backup-databases.sh
+```
+
+- Uses `sqlite3 .backup` (online-safe, works while agent is running)
+- Backs up: `edge-agent.db`, `data/edge-state.db`, `data/rules.db`, `data/plans.db`, `data/scheduler.db`
+- Destination: `/Users/<user>/Code/archety-edge/backups/<date>/`
+- Keeps last 7 days, auto-rotates old backups
+- Also backs up the port registry
+
+**Install daily cron job (runs at 3am):**
+
+```bash
+sudo ./backup-databases.sh --install-cron
+```
+
+---
+
+## Sentry Error Tracking
+
+Sentry provides error alerting and per-persona monitoring using the existing `SentryMonitoring` class in `src/monitoring/sentry.ts`.
+
+### Setup
+
+1. Create a **single Sentry project** (e.g., `archety-edge`) at [sentry.io](https://sentry.io)
+2. Copy the DSN from Project Settings → Client Keys
+3. Pass it when provisioning personas:
+
+```bash
+sudo ./setup-persona.sh \
+  --persona-id luna \
+  --phone "+1..." \
+  --edge-secret "..." \
+  --sentry-dsn "https://xxx@oXXX.ingest.sentry.io/YYY"
+```
+
+### What you get
+
+- **Error alerting** — Sentry alerts on crashes, backend failures, AppleScript errors
+- **Per-persona filtering** — filter by tag `agent.id: luna1` or `agent.id: nyx1`
+- **Environment separation** — filter by `environment: production` vs `development`
+- **Performance monitoring** — traces and profiling at 10% sample rate
+
+Use **one DSN** for all personas. The `environment` flag (defaults to `"production"`) separates dev from prod in the dashboard. Set up alert rules scoped to `environment:production` to avoid dev noise.
+
+---
+
+## Log Rotation
+
+`setup-persona.sh` automatically installs a `newsyslog.d` config for each persona:
+
+- **Location:** `/etc/newsyslog.d/archety-edge-<persona>.conf`
+- **Rotates** when logs reach 10MB
+- **Keeps** 7 compressed backups (gzip)
+- **Covers:** `logs/edge-agent.out.log`, `logs/edge-agent.err.log`, `edge-agent.log`
+
+macOS runs newsyslog automatically — no cron needed.
+
+---
+
+## Dev Mode: Runtime Persona Switching
+
+For development and testing, you can switch personas at runtime from a single edge agent
+without needing separate macOS users, phone numbers, or running agents per persona.
+
+### How It Works
+
+The `persona_id` field is just a tag on outbound HTTP payloads to the backend. It is **not** part of
+the WebSocket connection. The backend's `PersonaResolver` uses Priority 1: explicit `persona_id` from
+the edge request — loading the full persona experience (passport, memory namespace, relationship state).
+
+When you switch `persona_id` at runtime, the backend responds with that persona's full voice,
+personality, and memory. No restart or reconnection needed.
+
+### Enabling Dev Mode
+
+Add the `dev` section to your `config.yaml`:
+
+```yaml
+dev:
+  enabled: true
+```
+
+Or use `--environment development` with `setup-persona.sh`, which adds this automatically.
+
+### Using the Admin Portal
+
+1. Open the admin portal at `http://127.0.0.1:3100`
+2. Click the **Personas** tab in the navigation
+3. You'll see all available personas as cards with their colors and taglines
+4. Click any persona card to switch — the change is instant, no restart required
+5. The Dashboard also shows a dev mode banner with the current persona
+
+### Using the API
+
+```bash
+# Check dev mode status
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3100/api/dev/status
+
+# List available personas (fetched from backend registry)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3100/api/dev/personas
+
+# Switch persona
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"persona_id": "nyx"}' http://localhost:3100/api/dev/switch-persona
+```
+
+### Important Notes
+
+- Dev mode only affects which persona the backend uses for responses — iMessage routing is unchanged
+- Messages still arrive and send on the same phone number (luna1's number)
+- With `dev.enabled: false` or missing, the Personas tab shows an explanatory message and the API returns 403
+- The persona list is fetched live from the backend's persona registry, so new personas appear automatically
 
 ---
 

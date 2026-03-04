@@ -4,7 +4,7 @@
 #
 # Usage:
 #   sudo ./setup-persona.sh \
-#     --persona-id vex \
+#     --persona-id nyx \
 #     --phone "+14155559876" \
 #     --edge-secret "your_shared_secret"
 #
@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: sudo $0 --persona-id <id> --phone <E.164> --edge-secret <secret> [--shard-id <n>]"
       echo ""
       echo "Required:"
-      echo "  --persona-id    Persona identifier (e.g., vex, echo, kael)"
+      echo "  --persona-id    Persona identifier (e.g., nyx, echo, kael)"
       echo "  --phone         iMessage phone number in E.164 format (e.g., +14155559876)"
       echo "  --edge-secret   Shared secret for backend HMAC token authentication"
       echo ""
@@ -97,7 +97,7 @@ fi
 
 # --- Validate formats ---
 if ! echo "$PERSONA_ID" | grep -qE '^[a-z][a-z0-9_]*$'; then
-  log_error "persona-id must be lowercase alphanumeric (e.g., vex, echo, kael)"
+  log_error "persona-id must be lowercase alphanumeric (e.g., nyx, echo, kael)"
   exit 1
 fi
 
@@ -388,7 +388,7 @@ ENTRY_FILE="${PROJECT_DIR}/dist/admin-portal/server/index.js"
 sudo -u "$MAC_USER" mkdir -p "$LAUNCH_AGENTS_DIR"
 
 # Clean up legacy daemons that may conflict (old system-domain plists)
-for LEGACY_LABEL in "com.sage.edge-agent" "com.archety.edge-agent"; do
+for LEGACY_LABEL in "com.luna.edge-agent" "com.sage.edge-agent" "com.archety.edge-agent"; do
   LEGACY_PLIST="/Library/LaunchDaemons/${LEGACY_LABEL}.plist"
   if launchctl list 2>/dev/null | grep -q "$LEGACY_LABEL"; then
     log_warn "Stopping legacy daemon: ${LEGACY_LABEL}"
@@ -580,7 +580,7 @@ echo "     launchctl print gui/\$(id -u)/${PLIST_LABEL} | head -n 40"
 echo "     curl -s http://localhost:${HEALTH_PORT}/health"
 echo ""
 echo "  9. Ensure HMAC token wiring is present (if using older archety-edge checkout):"
-echo "     cp /Users/sage1/migrate_hmac_luna.sh ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh"
+echo "     cp /Users/luna1/migrate_hmac_luna.sh ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh"
 echo "     sudo chown ${MAC_USER}:staff ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh"
 echo "     sudo -u ${MAC_USER} bash -lc 'cd ${PROJECT_DIR} && chmod +x migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh && ./migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh'"
 echo ""

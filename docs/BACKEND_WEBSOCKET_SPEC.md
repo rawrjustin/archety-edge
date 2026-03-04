@@ -534,7 +534,7 @@ wsServer.sendCommand('edge_13107404018', {
 ## Questions & Support
 
 For questions about this specification or implementation support:
-- Edge agent repository: `/Users/sage1/Code/edge-relay`
+- Edge agent repository: `/Users/luna1/Code/edge-relay`
 - Edge agent implementation: `src/backend/WebSocketClient.ts`
 - Contact: [Your contact information]
 

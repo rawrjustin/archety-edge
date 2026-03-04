@@ -12,10 +12,11 @@ export interface BackendMessageRequest {
   text: string;                // Message text
   timestamp: number;           // Unix timestamp
   participants: string[];      // All participants in conversation
-  persona_id: string;          // Persona to respond (e.g., "sage", "vex")
+  persona_id: string;          // Persona to respond (e.g., "luna", "kael")
+  persona_phone?: string;      // Phone number of this persona's iMessage account
   metadata?: {                 // Optional metadata
     is_first_message?: boolean;
-    mentioned_sage?: boolean;
+    mentioned_luna?: boolean;
     was_redacted?: boolean;
     redacted_fields?: string[];
     filter_reason?: string;
@@ -74,7 +75,7 @@ export interface PhotoUploadRequest {
   context?: BackendMiniAppContext;
   // Group photo handling
   is_group?: boolean;           // Whether this photo is from a group chat
-  caption?: string;             // Photo caption text (backend checks for Sage mentions)
+  caption?: string;             // Photo caption text (backend checks for Luna mentions)
 }
 
 export interface PhotoUploadResponse {

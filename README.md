@@ -17,7 +17,7 @@ Intelligent edge agent that bridges iMessage with a cloud backend, enabling mess
 ```bash
 # 1. Install dependencies
 brew install node
-cd /Users/sage1/Code/edge-relay
+cd /Users/luna1/Code/edge-relay
 npm install
 
 # 2. Configure
@@ -66,6 +66,7 @@ Access at: **http://127.0.0.1:3100**
 - 🗺️ Conversation plans viewer
 - 🧪 Test tools for debugging and message testing
 - 🔄 Service control (restart from web interface)
+- 🎭 **Dev mode persona switcher** — switch between Luna, Nyx, Echo, Kael at runtime from one agent (set `dev.enabled: true` in config.yaml)
 
 See [admin-portal/README.md](./admin-portal/README.md) for full documentation.
 
@@ -83,26 +84,51 @@ See [admin-portal/README.md](./admin-portal/README.md) for full documentation.
 
 ### Multi-Persona Setup (Production)
 
-Run multiple personas (Sage, Vex, Echo, Kael, etc.) on a single Mac mini, each with its own phone number:
+Run multiple personas (Luna, Nyx, Echo, Kael, etc.) on a single Mac mini, each with its own phone number:
 
 ```bash
-# Provision a new persona in one command
+# Bootstrap a fresh Mac mini (install prereqs, configure OS)
+sudo ./bootstrap-mac.sh
+
+# Provision a new persona (with optional Sentry + Amplitude)
 sudo ./setup-persona.sh \
-  --persona-id vex \
+  --persona-id nyx \
   --phone "+14155559876" \
-  --edge-secret "your_shared_secret"
+  --edge-secret "your_shared_secret" \
+  --sentry-dsn "https://xxx@oXXX.ingest.sentry.io/YYY" \
+  --amplitude-key "your_amplitude_key"
 
 # View all provisioned personas and their status
 ./list-personas.sh
 
+# Pull, build, and restart all personas after a code push
+sudo ./update-all-personas.sh
+
+# Back up all persona databases (online-safe)
+sudo ./backup-databases.sh
+sudo ./backup-databases.sh --install-cron  # install daily 3am cron job
+
 # Remove a persona
-sudo ./teardown-persona.sh --persona-id vex
-sudo ./teardown-persona.sh --persona-id vex --delete-user  # also remove macOS account
+sudo ./teardown-persona.sh --persona-id nyx
+sudo ./teardown-persona.sh --persona-id nyx --delete-user  # also remove macOS account
 ```
 
 `setup-persona.sh` automates: macOS user creation, repo clone, dependency install, native helper build, `config.yaml` and `.env` generation with auto-assigned unique ports, and LaunchAgent installation. Each persona runs as a user-domain LaunchAgent with auto-start on boot and crash recovery. After running it, follow the printed checklist for manual steps (Fast User Switching login, iMessage sign-in, macOS permissions).
 
-**See [Multi-Persona Setup Guide](docs/setup/MULTI_PERSONA_EDGE_SETUP.md) for architecture details and validation steps.**
+**Operations scripts:**
+
+| Script | Purpose |
+|--------|---------|
+| `bootstrap-mac.sh` | Prepare a fresh Mac mini (Homebrew, Node, SSH, sleep settings) |
+| `setup-persona.sh` | Provision a new persona (user, repo, build, config, LaunchDaemon, log rotation) |
+| `teardown-persona.sh` | Remove a persona (`--delete-user` to also remove macOS account) |
+| `list-personas.sh` | Show all personas with health status |
+| `update-all-personas.sh` | Fleet-wide git pull, build, restart with health checks |
+| `backup-databases.sh` | SQLite backup for all personas, 7-day retention, cron-friendly |
+
+`setup-persona.sh` automates: macOS user creation, repo clone, dependency install, native helper build, `config.yaml` and `.env` generation with auto-assigned unique ports, LaunchDaemon installation, Sentry/Amplitude config, and log rotation. After running it, follow the printed checklist for manual steps (Fast User Switching login, iMessage sign-in, macOS permissions).
+
+**See [Multi-Persona Setup Guide](docs/setup/MULTI_PERSONA_EDGE_SETUP.md) for architecture details, Sentry setup, and validation steps.**
 
 ## Performance
 
@@ -180,9 +206,12 @@ edge-relay/
 ├── config.yaml               # Runtime configuration
 ├── .env                      # Secrets (not in git)
 ├── edge-agent.sh             # Single-agent management script
+├── bootstrap-mac.sh          # Fresh Mac mini setup (prereqs + OS config)
 ├── setup-persona.sh          # Provision a new persona (multi-agent)
 ├── teardown-persona.sh       # Remove a persona
 ├── list-personas.sh          # Show all personas and status
+├── update-all-personas.sh    # Fleet-wide pull, build, restart
+├── backup-databases.sh       # SQLite backup with rotation
 └── package.json              # Dependencies
 ```
 

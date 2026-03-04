@@ -8,7 +8,7 @@ export const ConfigSchema = z.object({
   edge: z.object({
     agent_id: z.string().min(1, 'agent_id is required'),
     user_phone: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format (E.164)'),
-    persona_id: z.string().min(1).regex(/^[a-z][a-z0-9_]*$/, 'persona_id must be lowercase alphanumeric').default('sage'),
+    persona_id: z.string().min(1).regex(/^[a-z][a-z0-9_]*$/, 'persona_id must be lowercase alphanumeric').default('luna'),
   }),
 
   backend: z.object({

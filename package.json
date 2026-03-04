@@ -1,7 +1,7 @@
 {
   "name": "edge-agent",
   "version": "1.0.0",
-  "description": "Mac Mini Edge Agent for iMessage relay to Sage backend",
+  "description": "Mac Mini Edge Agent for iMessage relay to backend",
   "main": "dist/src/index.js",
   "scripts": {
     "build": "tsc",

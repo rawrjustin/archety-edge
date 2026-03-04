@@ -6,7 +6,7 @@ import { SyncRequest, SyncResponse } from '../interfaces/ICommands';
 import { ILogger } from '../interfaces/ILogger';
 
 /**
- * RailwayClient - Backend client for communicating with Sage backend on Railway
+ * RailwayClient - Backend client for communicating with backend on Railway
  *
  * Updated November 2025 for new backend architecture:
  * - Bearer token authentication (EDGE_SECRET - same for HTTP and WebSocket)
@@ -266,7 +266,7 @@ export class RailwayClient implements IBackendClient {
       });
       const status = response.data.status || 'processing';
       if (status === 'stored') {
-        this.logger.info(`[${uploadId}] 📦 Photo stored for deferred processing (photo_id=${response.data.photo_id}, group photo without Sage mention)`);
+        this.logger.info(`[${uploadId}] 📦 Photo stored for deferred processing (photo_id=${response.data.photo_id}, group photo without Luna mention)`);
       } else {
         this.logger.info(`[${uploadId}] ✅ Photo upload successful (photo_id=${response.data.photo_id}, status=${status})`);
       }

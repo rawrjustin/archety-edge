@@ -8,6 +8,7 @@ import Scheduled from './pages/Scheduled';
 import Rules from './pages/Rules';
 import Plans from './pages/Plans';
 import TestTools from './pages/TestTools';
+import Personas from './pages/Personas';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -61,6 +62,13 @@ function App() {
               Plans
             </Link>
             <Link
+              to="/personas"
+              className={activeTab === 'personas' ? 'active' : ''}
+              onClick={() => setActiveTab('personas')}
+            >
+              Personas
+            </Link>
+            <Link
               to="/test"
               className={activeTab === 'test' ? 'active' : ''}
               onClick={() => setActiveTab('test')}
@@ -78,6 +86,7 @@ function App() {
             <Route path="/scheduled" element={<Scheduled />} />
             <Route path="/rules" element={<Rules />} />
             <Route path="/plans" element={<Plans />} />
+            <Route path="/personas" element={<Personas />} />
             <Route path="/test" element={<TestTools />} />
           </Routes>
         </main>

@@ -49,6 +49,18 @@ class EdgeAgentAdminAdapter implements IAdminInterface {
   async testBackendConnection() {
     return this.agent.testBackendConnection();
   }
+
+  switchPersona(personaId: string) {
+    return this.agent.switchPersona(personaId);
+  }
+
+  getPersonaId() {
+    return this.agent.getPersonaId();
+  }
+
+  isDevMode() {
+    return this.agent.isDevMode();
+  }
 }
 
 /**

@@ -36,6 +36,9 @@ export interface IAdminInterface {
   disableRule(ruleId: string): Promise<void>;
   sendTestMessage(threadId: string, text: string): Promise<void>;
   testBackendConnection(): Promise<{ healthy: boolean; latency: number }>;
+  switchPersona(personaId: string): { previous: string; current: string };
+  getPersonaId(): string;
+  isDevMode(): boolean;
 }
 
 export class AdminServer {
@@ -283,6 +286,59 @@ export class AdminServer {
     this.app.get('/api/test/backend', async (req: Request, res: Response) => {
       try {
         const result = await this.adminInterface.testBackendConnection();
+        res.json(result);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Dev mode endpoints (persona switching)
+    this.app.get('/api/dev/status', (req: Request, res: Response) => {
+      if (!this.adminInterface.isDevMode()) {
+        return res.status(403).json({ error: 'Dev mode is not enabled. Set dev.enabled: true in config.yaml' });
+      }
+      res.json({
+        dev_mode: true,
+        current_persona: this.adminInterface.getPersonaId(),
+      });
+    });
+
+    this.app.get('/api/dev/personas', async (req: Request, res: Response) => {
+      if (!this.adminInterface.isDevMode()) {
+        return res.status(403).json({ error: 'Dev mode is not enabled. Set dev.enabled: true in config.yaml' });
+      }
+      try {
+        const backendUrl = this.config.backend?.url;
+        if (!backendUrl) {
+          return res.status(500).json({ error: 'Backend URL not configured' });
+        }
+        // Fetch personas from the backend's persona registry (using Node 18+ native fetch)
+        const response = await fetch(`${backendUrl}/api/personas`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+          return res.status(502).json({ error: `Backend returned ${response.status}` });
+        }
+        const personas = await response.json();
+        res.json({
+          current_persona: this.adminInterface.getPersonaId(),
+          personas,
+        });
+      } catch (error: any) {
+        res.status(502).json({ error: `Failed to fetch personas from backend: ${error.message}` });
+      }
+    });
+
+    this.app.post('/api/dev/switch-persona', (req: Request, res: Response) => {
+      if (!this.adminInterface.isDevMode()) {
+        return res.status(403).json({ error: 'Dev mode is not enabled. Set dev.enabled: true in config.yaml' });
+      }
+      const { persona_id } = req.body;
+      if (!persona_id || typeof persona_id !== 'string') {
+        return res.status(400).json({ error: 'persona_id is required' });
+      }
+      try {
+        const result = this.adminInterface.switchPersona(persona_id);
         res.json(result);
       } catch (error: any) {
         res.status(500).json({ error: error.message });

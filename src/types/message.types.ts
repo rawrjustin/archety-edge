@@ -46,7 +46,7 @@ export const BackendMessageRequestSchema = z.object({
   participants: z.array(z.string()),   // All participants in conversation
   metadata: z.object({
     is_first_message: z.boolean().optional(),
-    mentioned_sage: z.boolean().optional(),
+    mentioned_luna: z.boolean().optional(),
     was_redacted: z.boolean().optional(),
     redacted_fields: z.array(z.string()).optional(),
     filter_reason: z.string().optional()

@@ -14,7 +14,7 @@ if [ -z "$PROCESSES" ]; then
     echo ""
     echo "To start:"
     echo "  sudo launchctl kickstart system/com.archety.edge-<persona><shard>"
-    echo "  (e.g., system/com.archety.edge-sage1)"
+    echo "  (e.g., system/com.archety.edge-luna1)"
     exit 1
 fi
 
@@ -47,7 +47,7 @@ echo "Recent logs:"
 echo "------------"
 # Try to find any persona's log directory
 LOG_FOUND=false
-for LOG_DIR in /Users/*/Code/archety-edge/logs /Users/sage1/Code/edge-relay/logs; do
+for LOG_DIR in /Users/*/Code/archety-edge/logs /Users/luna1/Code/edge-relay/logs; do
     if [ -f "$LOG_DIR/edge-agent.out.log" ]; then
         echo "($LOG_DIR):"
         tail -5 "$LOG_DIR/edge-agent.out.log" 2>/dev/null

@@ -1,7 +1,7 @@
 edge:
-  agent_id: "sage1"  # Stable dev runtime slot identity
+  agent_id: "luna1"  # Stable dev runtime slot identity
   user_phone: "+13107404018"    # Dev iMessage account for this runtime
-  persona_id: "luna"            # Switchable: luna/vex/echo/etc for dev testing
+  persona_id: "luna"            # Switchable: luna/nyx/echo/etc for dev testing
 
 backend:
   url: "https://api-dev.ikiro.ai"
@@ -15,8 +15,8 @@ websocket:
 
 imessage:
   poll_interval_seconds: 1  # Quick Win: Faster detection (0-1s vs 0-2s)
-  db_path: "/Users/sage1/Library/Messages/chat.db"
-  attachments_path: "/Users/sage1/Library/Messages/Attachments"
+  db_path: "/Users/luna1/Library/Messages/chat.db"
+  attachments_path: "/Users/luna1/Library/Messages/Attachments"
   transport_mode: "native_helper"  # native_helper or applescript
   bridge_executable: "./native/messages-helper/.build/release/messages-helper"
   bridge_args: []

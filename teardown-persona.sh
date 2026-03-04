@@ -3,8 +3,8 @@
 # teardown-persona.sh — Remove an edge agent persona from this Mac
 #
 # Usage:
-#   sudo ./teardown-persona.sh --persona-id vex
-#   sudo ./teardown-persona.sh --persona-id vex --delete-user
+#   sudo ./teardown-persona.sh --persona-id nyx
+#   sudo ./teardown-persona.sh --persona-id nyx --delete-user
 # =============================================================================
 
 set -e
@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       echo "Usage: sudo $0 --persona-id <id> [--shard-id <n>] [--delete-user]"
       echo ""
-      echo "  --persona-id    Persona to remove (e.g., vex)"
+      echo "  --persona-id    Persona to remove (e.g., nyx)"
       echo "  --shard-id      Shard number (default: 1)"
       echo "  --delete-user   Also delete the macOS user account and home directory"
       exit 0
@@ -92,8 +92,8 @@ if [[ -f "$OLD_SYSTEM_PLIST" ]]; then
   log_done "Old system-domain plist removed: ${OLD_SYSTEM_PLIST}"
 fi
 
-# Clean up legacy daemon if this persona is sage
-if [[ "$PERSONA_ID" == "sage" ]]; then
+# Clean up legacy daemon if this persona is luna (or old sage name)
+if [[ "$PERSONA_ID" == "luna" || "$PERSONA_ID" == "sage" ]]; then
   LEGACY_LABEL="com.sage.edge-agent"
   LEGACY_PLIST="/Library/LaunchDaemons/${LEGACY_LABEL}.plist"
   if launchctl list 2>/dev/null | grep -q "$LEGACY_LABEL"; then

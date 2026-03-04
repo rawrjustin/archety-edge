@@ -930,7 +930,7 @@ class EdgeAgent {
             size_bytes: item.sizeBytes ?? undefined,
             attachment_guid: item.attachment.guid,
             context: backendContext,
-            // Group photo handling - backend will defer processing if group without Sage mention
+            // Group photo handling - backend will defer processing if group without Luna mention
             is_group: message.isGroup,
             caption
           });
@@ -950,7 +950,7 @@ class EdgeAgent {
           // Log based on processing status
           const status = uploadResponse.status || 'processing';
           if (status === 'stored') {
-            this.logger.info(`📦 Photo ${item.attachment.guid} stored for deferred processing (group chat, no Sage mention)`);
+            this.logger.info(`📦 Photo ${item.attachment.guid} stored for deferred processing (group chat, no Luna mention)`);
           } else {
             this.logger.info(`📸 Uploaded attachment ${item.attachment.guid} (photo_id=${uploadResponse.photo_id})`);
           }

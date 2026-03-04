@@ -79,6 +79,11 @@ export const apiService = {
   sendTestMessage: (threadId, text) =>
     api.post('/api/test/message', { thread_id: threadId, text }),
   testBackendConnection: () => api.get('/api/test/backend'),
+
+  // Dev mode (persona switching)
+  getDevStatus: () => api.get('/api/dev/status'),
+  getDevPersonas: () => api.get('/api/dev/personas'),
+  switchPersona: (personaId) => api.post('/api/dev/switch-persona', { persona_id: personaId }),
 };
 
 // WebSocket for live logs

@@ -31,7 +31,7 @@ echo "==========================================="
 echo
 echo "IMPORTANT: If upgrading Node.js, rebuild native modules in all project directories:"
 echo ""
-for PROJ_DIR in /Users/*/Code/archety-edge /Users/sage1/Code/edge-relay; do
+for PROJ_DIR in /Users/*/Code/archety-edge /Users/luna1/Code/edge-relay; do
     if [ -d "$PROJ_DIR/node_modules" ]; then
         echo "  Rebuilding native modules in $PROJ_DIR ..."
         (cd "$PROJ_DIR" && npm rebuild 2>&1) | tail -3

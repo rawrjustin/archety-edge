@@ -6,6 +6,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [backendTest, setBackendTest] = useState(null);
+  const [devStatus, setDevStatus] = useState(null);
 
   const loadStats = async () => {
     try {
@@ -42,9 +43,19 @@ function Dashboard() {
     }
   };
 
+  const loadDevStatus = async () => {
+    try {
+      const response = await apiService.getDevStatus();
+      setDevStatus(response.data);
+    } catch {
+      setDevStatus(null);
+    }
+  };
+
   useEffect(() => {
     loadStats();
-    const interval = setInterval(loadStats, 5000); // Refresh every 5 seconds
+    loadDevStatus();
+    const interval = setInterval(() => { loadStats(); loadDevStatus(); }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -73,6 +84,24 @@ function Dashboard() {
 
   return (
     <div className="dashboard">
+      {devStatus && devStatus.dev_mode && (
+        <div className="card" style={{ borderColor: '#00ccff', borderWidth: '2px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{
+              backgroundColor: '#00ccff30',
+              color: '#00ccff',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '4px',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+            }}>DEV MODE</span>
+            <span style={{ color: '#e0e0e0' }}>
+              Active persona: <strong style={{ color: '#00ff88' }}>{devStatus.current_persona}</strong>
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <h2>Edge Agent Status</h2>
 

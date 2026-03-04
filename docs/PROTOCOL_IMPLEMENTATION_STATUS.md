@@ -5,7 +5,7 @@
 
 ## Protocol Compliance
 
-Based on `/Users/sage1/Downloads/WEBSOCKET_PROTOCOL.md`, here's our implementation status:
+Based on `/Users/luna1/Downloads/WEBSOCKET_PROTOCOL.md`, here's our implementation status:
 
 ---
 

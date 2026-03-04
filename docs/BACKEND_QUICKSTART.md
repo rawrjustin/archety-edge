@@ -288,7 +288,7 @@ If WebSocket not found:
 The edge agent is already running and attempting to connect. Check logs:
 
 ```bash
-tail -f /Users/sage1/Code/edge-relay/edge-agent.log | grep WebSocket
+tail -f /Users/luna1/Code/edge-relay/edge-agent.log | grep WebSocket
 ```
 
 You'll see connection attempts every few seconds.

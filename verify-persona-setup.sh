@@ -95,7 +95,7 @@ require_file "${PROJECT_DIR}/.env" ".env"
 require_file "${PLIST_PATH}" "LaunchAgent plist"
 
 log_step "Legacy daemon conflicts"
-for LEGACY_LABEL in "com.sage.edge-agent" "com.archety.edge-agent"; do
+for LEGACY_LABEL in "com.luna.edge-agent" "com.sage.edge-agent" "com.archety.edge-agent"; do
   LEGACY_PLIST="/Library/LaunchDaemons/${LEGACY_LABEL}.plist"
   if launchctl list 2>/dev/null | grep -q "$LEGACY_LABEL"; then
     check_fail "Legacy daemon '${LEGACY_LABEL}' is loaded in launchd — stop it with: sudo launchctl bootout system/${LEGACY_LABEL}"
