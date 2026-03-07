@@ -19,6 +19,10 @@ export class WebSocketClient {
   private shouldReconnect = true;
   private isClosingForReconnect = false; // Flag to prevent reconnect loop during cleanup
   private pingInterval: NodeJS.Timeout | null = null;
+  private pongTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private lastPongReceived: number = Date.now();
+  private static readonly PONG_TIMEOUT_MS = 10000; // 10s to receive pong before declaring dead
   private onCommandCallback: ((command: EdgeCommandWrapper) => Promise<void>) | null = null;
   private onConnectedCallback: (() => void) | null = null;
   private onDisconnectedCallback: (() => void) | null = null;
@@ -113,6 +117,12 @@ export class WebSocketClient {
         const timeout = setTimeout(() => {
           this.logger.error('WebSocket connection timeout');
           this.isConnecting = false;
+          // Clean up the timed-out socket to prevent ghost connections
+          if (this.ws) {
+            this.ws.removeAllListeners();
+            this.ws.close();
+            this.ws = null;
+          }
           resolve(false);
         }, 10000);
 
@@ -142,6 +152,7 @@ export class WebSocketClient {
     this.logger.info('✅ WebSocket connected');
     this.reconnectAttempts = 0;
     this.reconnectDelay = 1000;
+    this.lastPongReceived = Date.now();
 
     // Start ping/pong for keepalive
     this.startPingInterval();
@@ -167,6 +178,11 @@ export class WebSocketClient {
           break;
 
         case 'pong':
+          this.lastPongReceived = Date.now();
+          if (this.pongTimeout) {
+            clearTimeout(this.pongTimeout);
+            this.pongTimeout = null;
+          }
           this.logger.debug('Received pong from server');
           break;
 
@@ -239,44 +255,84 @@ export class WebSocketClient {
 
     // Attempt reconnection if enabled (will retry indefinitely)
     if (this.shouldReconnect) {
-      this.scheduleReconnect();
+      // Use immediate reconnect for server-initiated restarts (code 1012)
+      // to minimize downtime during backend deploys
+      if (code === 1012) {
+        this.logger.info('Server restart detected (1012) - reconnecting immediately');
+        this.reconnectAttempts = 0;
+        this.connect();
+      } else {
+        this.scheduleReconnect();
+      }
     }
   }
 
   /**
-   * Schedule a reconnection attempt with exponential backoff
+   * Schedule a reconnection attempt with exponential backoff + jitter
    */
   private scheduleReconnect(): void {
+    // Clear any existing reconnect timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     this.reconnectAttempts++;
-    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), this.maxReconnectDelay);
+    const baseDelay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), this.maxReconnectDelay);
+    // Add random jitter (0-25% of base delay) to prevent thundering herd
+    const jitter = Math.floor(Math.random() * baseDelay * 0.25);
+    const delay = baseDelay + jitter;
 
     this.logger.info(`Scheduling WebSocket reconnect attempt #${this.reconnectAttempts} in ${delay}ms`);
 
-    setTimeout(() => {
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       this.logger.info(`Attempting WebSocket reconnect (attempt #${this.reconnectAttempts})`);
       this.connect();
     }, delay);
   }
 
   /**
-   * Start ping interval to keep connection alive
+   * Start ping interval to keep connection alive.
+   * Each ping sets a pong timeout - if no pong arrives within PONG_TIMEOUT_MS,
+   * the connection is considered dead and forcefully closed to trigger reconnect.
    */
   private startPingInterval(): void {
+    this.stopPingInterval(); // Ensure no duplicate intervals
+
     this.pingInterval = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.logger.debug('Sending ping to server');
         this.send({ type: 'ping' });
+
+        // Set a pong timeout - if server doesn't respond, force-close
+        if (this.pongTimeout) {
+          clearTimeout(this.pongTimeout);
+        }
+        this.pongTimeout = setTimeout(() => {
+          const staleness = Date.now() - this.lastPongReceived;
+          this.logger.warn(`Pong timeout: no response in ${WebSocketClient.PONG_TIMEOUT_MS}ms (last pong ${staleness}ms ago)`);
+          // Force-close the zombie connection to trigger reconnect
+          if (this.ws) {
+            this.logger.warn('Force-closing zombie WebSocket connection');
+            this.ws.terminate();
+          }
+        }, WebSocketClient.PONG_TIMEOUT_MS);
       }
     }, 30000); // Ping every 30 seconds
   }
 
   /**
-   * Stop ping interval
+   * Stop ping interval and pong timeout
    */
   private stopPingInterval(): void {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
+    }
+    if (this.pongTimeout) {
+      clearTimeout(this.pongTimeout);
+      this.pongTimeout = null;
     }
   }
 
@@ -347,6 +403,12 @@ export class WebSocketClient {
     this.shouldReconnect = false;
     this.stopPingInterval();
 
+    // Clear pending reconnect timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -360,11 +422,13 @@ export class WebSocketClient {
     connected: boolean;
     reconnectAttempts: number;
     state: string;
+    lastPongAge: number;
   } {
     return {
       connected: this.isConnected(),
       reconnectAttempts: this.reconnectAttempts,
-      state: this.ws ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.ws.readyState] : 'DISCONNECTED'
+      state: this.ws ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.ws.readyState] : 'DISCONNECTED',
+      lastPongAge: Date.now() - this.lastPongReceived
     };
   }
 }

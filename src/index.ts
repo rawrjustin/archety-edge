@@ -63,6 +63,12 @@ class EdgeAgent {
   private lastCommandId: string | null = null;
   private useWebSocket: boolean = true; // Enable WebSocket by default
 
+  // iCloud sync watchdog: restart Messages.app if no new messages for too long
+  private lastNewMessageTime: Date = new Date();
+  private syncWatchdogInterval: NodeJS.Timeout | null = null;
+  private static readonly SYNC_STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+  private static readonly SYNC_WATCHDOG_CHECK_MS = 5 * 60 * 1000; // check every 5 minutes
+
   // MEMORY LEAK FIX: Track all timers for cleanup
   private activeTimers: Set<NodeJS.Timeout> = new Set();
   private activeIntervals: Set<NodeJS.Timeout> = new Set();
@@ -293,6 +299,7 @@ class EdgeAgent {
       this.isRunning = true;
 
       this.startPolling();
+      this.startSyncWatchdog();
 
       // Try to connect WebSocket for real-time commands
       if (this.useWebSocket) {
@@ -347,6 +354,39 @@ class EdgeAgent {
   }
 
   /**
+   * Start the iCloud sync watchdog.
+   * If no new messages arrive within SYNC_STALE_THRESHOLD_MS, restart Messages.app
+   * to kick iCloud sync back into action.
+   */
+  private startSyncWatchdog(): void {
+    this.lastNewMessageTime = new Date();
+    this.syncWatchdogInterval = this.safeSetInterval(() => {
+      this.checkSyncStaleness();
+    }, EdgeAgent.SYNC_WATCHDOG_CHECK_MS);
+    this.logger.info(`Sync watchdog started (restart Messages.app if no messages for ${EdgeAgent.SYNC_STALE_THRESHOLD_MS / 60000}min)`);
+  }
+
+  private checkSyncStaleness(): void {
+    const staleDuration = Date.now() - this.lastNewMessageTime.getTime();
+    if (staleDuration < EdgeAgent.SYNC_STALE_THRESHOLD_MS) {
+      return;
+    }
+
+    const staleMinutes = Math.round(staleDuration / 60000);
+    this.logger.warn(`iCloud sync may be stalled — no new messages for ${staleMinutes}min, restarting Messages.app`);
+
+    const { execSync } = require('child_process');
+    try {
+      execSync('killall Messages 2>/dev/null; sleep 2; open -a Messages', { timeout: 15000 });
+      this.logger.info('Messages.app restarted to refresh iCloud sync');
+      // Reset timer so we don't restart again immediately
+      this.lastNewMessageTime = new Date();
+    } catch (error: any) {
+      this.logger.error('Failed to restart Messages.app:', error.message);
+    }
+  }
+
+  /**
    * Poll for new messages and process them
    */
   private async pollMessages(): Promise<void> {
@@ -359,6 +399,9 @@ class EdgeAgent {
       }
 
       this.logger.info(`📬 Processing ${messages.length} new message(s)`);
+
+      // Reset sync watchdog — we got fresh messages
+      this.lastNewMessageTime = new Date();
 
       // OPTIMIZATION: Process messages in parallel (up to 3 concurrent)
       // Improves throughput 2-3× when multiple messages arrive together
