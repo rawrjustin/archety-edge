@@ -20,7 +20,7 @@ log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_done()  { echo -e "  ${GREEN}[done]${NC} $1"; }
 
-PORT_REGISTRY="/usr/local/etc/archety-edge-ports.json"
+PORT_REGISTRY="/usr/local/etc/ikiro-edge-ports.json"
 PERSONA_ID=""
 SHARD_ID="1"
 DELETE_USER=false
@@ -55,7 +55,7 @@ fi
 
 MAC_USER="${PERSONA_ID}${SHARD_ID}"
 USER_HOME="/Users/${MAC_USER}"
-PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
+PLIST_LABEL="com.ikiro.edge-${PERSONA_ID}${SHARD_ID}"
 PLIST_PATH="${USER_HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
 OLD_SYSTEM_PLIST="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
 
@@ -109,7 +109,7 @@ if [[ "$PERSONA_ID" == "luna" || "$PERSONA_ID" == "sage" ]]; then
 fi
 
 # --- Kill any remaining processes ---
-pkill -f "node.*${MAC_USER}.*archety-edge" 2>/dev/null || true
+pkill -f "node.*${MAC_USER}.*ikiro-edge" 2>/dev/null || true
 
 # --- Remove from port registry ---
 if [[ -f "$PORT_REGISTRY" ]]; then
@@ -136,7 +136,7 @@ if [[ "$DELETE_USER" == true ]]; then
   fi
 else
   log_info "macOS user '${MAC_USER}' preserved (use --delete-user to remove)"
-  log_info "Project files preserved at /Users/${MAC_USER}/Code/archety-edge"
+  log_info "Project files preserved at /Users/${MAC_USER}/Code/ikiro-edge"
 fi
 
 echo ""

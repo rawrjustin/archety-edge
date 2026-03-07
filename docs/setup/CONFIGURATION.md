@@ -17,7 +17,7 @@ edge:
   user_phone: "+1234567890"    # Your phone number (REQUIRED)
 
 backend:
-  url: "https://archety-backend.onrender.com"
+  url: "https://api.ikiro.ai"
   sync_interval_seconds: 60
 
 imessage:
@@ -72,7 +72,7 @@ Override specific performance settings:
 
 ```yaml
 backend:
-  url: "https://archety-backend.onrender.com"
+  url: "https://api.ikiro.ai"
   sync_interval_seconds: 60
   request_timeout_ms: 10000  # HTTP request timeout
   max_concurrent_requests: 3  # Parallel backend calls
@@ -110,7 +110,7 @@ EDGE_SECRET=your_shared_secret_from_backend_team
 REGISTRATION_TOKEN=your_registration_token
 
 # Optional overrides
-# BACKEND_URL=https://archety-backend.onrender.com
+# BACKEND_URL=https://api.ikiro.ai
 # USER_PHONE=+1234567890
 ```
 

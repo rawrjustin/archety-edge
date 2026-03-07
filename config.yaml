@@ -52,5 +52,5 @@ monitoring:
     port: 3001  # Health check HTTP server port
 
 security:
-  keychain_service: "com.archety.edge"
+  keychain_service: "com.ikiro.edge"
   keychain_account: "edge-state"

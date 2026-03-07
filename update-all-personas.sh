@@ -31,7 +31,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step()  { echo -e "\n${BLUE}${BOLD}==> $1${NC}"; }
 log_done()  { echo -e "  ${GREEN}[done]${NC} $1"; }
 
-PORT_REGISTRY="/usr/local/etc/archety-edge-ports.json"
+PORT_REGISTRY="/usr/local/etc/ikiro-edge-ports.json"
 FORCE_BUILD=false
 HEALTH_WAIT=5
 
@@ -88,8 +88,8 @@ SUCCESS=0
 FAILED=0
 
 while IFS='|' read -r PERSONA_ID MAC_USER HEALTH_PORT; do
-  PROJECT_DIR="/Users/${MAC_USER}/Code/archety-edge"
-  PLIST_LABEL="com.archety.edge-${PERSONA_ID}"
+  PROJECT_DIR="/Users/${MAC_USER}/Code/ikiro-edge"
+  PLIST_LABEL="com.ikiro.edge-${PERSONA_ID}"
 
   log_step "${PERSONA_ID} (${MAC_USER})"
 

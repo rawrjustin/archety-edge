@@ -3,7 +3,7 @@
 # list-personas.sh — Show all provisioned edge agent personas and their status
 # =============================================================================
 
-PORT_REGISTRY="/usr/local/etc/archety-edge-ports.json"
+PORT_REGISTRY="/usr/local/etc/ikiro-edge-ports.json"
 
 BOLD='\033[1m'
 GREEN='\033[0;32m'
@@ -51,7 +51,7 @@ for pid in sorted(registry.keys()):
     STATUS="${GREEN}running${NC}"
   else
     # Check if LaunchDaemon is loaded
-    if sudo launchctl list 2>/dev/null | grep -q "com.archety.edge-${persona}"; then
+    if sudo launchctl list 2>/dev/null | grep -q "com.ikiro.edge-${persona}"; then
       STATUS="${YELLOW}loaded${NC}"
     else
       STATUS="${RED}stopped${NC}"

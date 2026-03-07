@@ -35,7 +35,7 @@ fi
 REAL_USER="${SUDO_USER:-$USER}"
 
 echo ""
-echo -e "${BOLD}=== Mac Mini Bootstrap for Archety Edge Agents ===${NC}"
+echo -e "${BOLD}=== Mac Mini Bootstrap for Ikiro Edge Agents ===${NC}"
 echo ""
 
 # =============================================================================

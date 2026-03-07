@@ -40,7 +40,7 @@ After running `setup-persona.sh`, follow the printed manual checklist (Fast User
 - Admin account with sudo access
 - 4-6 iMessage-capable phone numbers (one per persona)
 - Each phone number activated with an Apple ID signed into iMessage
-- The `archety-edge` repo cloned and buildable (`npm run build` succeeds)
+- The `ikiro-edge` repo cloned and buildable (`npm run build` succeeds)
 
 ---
 
@@ -164,20 +164,20 @@ sudo -u echo1 sqlite3 /Users/echo1/Library/Messages/chat.db "SELECT COUNT(*) FRO
 ### 3.1 Clone the repo into each user's home directory
 
 ```bash
-# Clone archety-edge for each persona user
-sudo -u nyx1 git clone <repo-url> /Users/nyx1/Code/archety-edge
-sudo -u echo1 git clone <repo-url> /Users/echo1/Code/archety-edge
+# Clone ikiro-edge for each persona user
+sudo -u nyx1 git clone <repo-url> /Users/nyx1/Code/ikiro-edge
+sudo -u echo1 git clone <repo-url> /Users/echo1/Code/ikiro-edge
 
 # Install dependencies for each
-sudo -u nyx1 bash -c "cd /Users/nyx1/Code/archety-edge && npm install && npm run build"
-sudo -u echo1 bash -c "cd /Users/echo1/Code/archety-edge && npm install && npm run build"
+sudo -u nyx1 bash -c "cd /Users/nyx1/Code/ikiro-edge && npm install && npm run build"
+sudo -u echo1 bash -c "cd /Users/echo1/Code/ikiro-edge && npm install && npm run build"
 ```
 
 ### 3.2 Create per-persona config.yaml
 
 Each persona gets its own config with unique `agent_id`, `persona_id`, `user_phone`, paths, and ports.
 
-**Example: `/Users/nyx1/Code/archety-edge/config.yaml`**
+**Example: `/Users/nyx1/Code/ikiro-edge/config.yaml`**
 
 ```yaml
 edge:
@@ -227,13 +227,13 @@ monitoring:
     port: 3002                   # UNIQUE per persona: luna=3001, nyx=3002, echo=3003, etc.
 
 security:
-  keychain_service: "com.archety.edge.nyx"   # UNIQUE per persona
+  keychain_service: "com.ikiro.edge.nyx"   # UNIQUE per persona
   keychain_account: "edge-state"
 ```
 
 ### 3.3 Create per-persona .env file
 
-**Example: `/Users/nyx1/Code/archety-edge/.env`**
+**Example: `/Users/nyx1/Code/ikiro-edge/.env`**
 
 ```bash
 EDGE_SECRET=<shared-edge-secret>
@@ -245,7 +245,7 @@ AMPLITUDE_API_KEY=<amplitude-key>
 ### 3.4 Build the native Swift helper per-user
 
 ```bash
-sudo -u nyx1 bash -c "cd /Users/nyx1/Code/archety-edge/native/messages-helper && swift build -c release"
+sudo -u nyx1 bash -c "cd /Users/nyx1/Code/ikiro-edge/native/messages-helper && swift build -c release"
 ```
 
 ### 3.5 Grant macOS permissions per-user
@@ -273,7 +273,7 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
 
 ### 4.1 Create per-persona plist
 
-**Example: `/Library/LaunchDaemons/com.archety.edge-nyx.plist`**
+**Example: `/Library/LaunchDaemons/com.ikiro.edge-nyx.plist`**
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -282,16 +282,16 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.archety.edge-nyx</string>
+    <string>com.ikiro.edge-nyx</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/node</string>
-        <string>/Users/nyx1/Code/archety-edge/dist/admin-portal/server/index.js</string>
+        <string>/Users/nyx1/Code/ikiro-edge/dist/admin-portal/server/index.js</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/nyx1/Code/archety-edge</string>
+    <string>/Users/nyx1/Code/ikiro-edge</string>
 
     <key>UserName</key>
     <string>nyx1</string>
@@ -306,10 +306,10 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>/Users/nyx1/Code/archety-edge/logs/edge-agent.out.log</string>
+    <string>/Users/nyx1/Code/ikiro-edge/logs/edge-agent.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/nyx1/Code/archety-edge/logs/edge-agent.err.log</string>
+    <string>/Users/nyx1/Code/ikiro-edge/logs/edge-agent.err.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>
@@ -331,15 +331,15 @@ Create a LaunchDaemon plist for each persona so they auto-start on boot.
 
 ```bash
 # Copy plist (repeat for each persona)
-sudo cp com.archety.edge-nyx.plist /Library/LaunchDaemons/
-sudo chown root:wheel /Library/LaunchDaemons/com.archety.edge-nyx.plist
-sudo chmod 644 /Library/LaunchDaemons/com.archety.edge-nyx.plist
+sudo cp com.ikiro.edge-nyx.plist /Library/LaunchDaemons/
+sudo chown root:wheel /Library/LaunchDaemons/com.ikiro.edge-nyx.plist
+sudo chmod 644 /Library/LaunchDaemons/com.ikiro.edge-nyx.plist
 
 # Load the daemon
-sudo launchctl load /Library/LaunchDaemons/com.archety.edge-nyx.plist
+sudo launchctl load /Library/LaunchDaemons/com.ikiro.edge-nyx.plist
 
 # Verify it's running
-sudo launchctl list | grep archety
+sudo launchctl list | grep ikiro
 ```
 
 ---
@@ -350,10 +350,10 @@ sudo launchctl list | grep archety
 
 ```bash
 # Check all edge agent processes
-ps aux | grep "node.*archety-edge" | grep -v grep
+ps aux | grep "node.*ikiro-edge" | grep -v grep
 
 # Check all LaunchDaemons
-sudo launchctl list | grep archety
+sudo launchctl list | grep ikiro
 
 # Hit each health endpoint
 curl -s http://localhost:3001/health  # luna
@@ -373,9 +373,9 @@ From a separate phone/device, send an iMessage to each persona's phone number. V
 
 ```bash
 # Monitor logs in parallel (open separate terminal tabs)
-tail -f /Users/luna1/Code/archety-edge/logs/edge-agent.out.log
-tail -f /Users/nyx1/Code/archety-edge/logs/edge-agent.out.log
-tail -f /Users/echo1/Code/archety-edge/logs/edge-agent.out.log
+tail -f /Users/luna1/Code/ikiro-edge/logs/edge-agent.out.log
+tail -f /Users/nyx1/Code/ikiro-edge/logs/edge-agent.out.log
+tail -f /Users/echo1/Code/ikiro-edge/logs/edge-agent.out.log
 ```
 
 ### 5.3 Verify no cross-contamination
@@ -406,13 +406,13 @@ After adding each persona, record:
 
 ```bash
 # After starting persona N
-echo "=== $(ps aux | grep 'node.*archety-edge' | grep -v grep | wc -l) personas running ==="
+echo "=== $(ps aux | grep 'node.*ikiro-edge' | grep -v grep | wc -l) personas running ==="
 
 # Memory pressure (green/yellow/red)
 memory_pressure
 
 # Per-process memory
-ps aux | grep "node.*archety-edge" | grep -v grep | awk '{printf "%-10s %s MB\n", $1, $6/1024}'
+ps aux | grep "node.*ikiro-edge" | grep -v grep | awk '{printf "%-10s %s MB\n", $1, $6/1024}'
 
 # Total system memory
 vm_stat | awk '
@@ -471,10 +471,10 @@ After confirming all agents run, reboot the Mac mini and verify recovery.
 
 ```bash
 # Verify all LaunchDaemons are installed
-ls -la /Library/LaunchDaemons/com.archety.edge-*.plist
+ls -la /Library/LaunchDaemons/com.ikiro.edge-*.plist
 
 # Verify plist syntax
-for f in /Library/LaunchDaemons/com.archety.edge-*.plist; do
+for f in /Library/LaunchDaemons/com.ikiro.edge-*.plist; do
   echo "Checking $f..."
   plutil -lint "$f"
 done
@@ -494,7 +494,7 @@ After reboot:
 
 ```bash
 # All agents should be running
-sudo launchctl list | grep archety
+sudo launchctl list | grep ikiro
 
 # All health endpoints should respond
 for port in 3001 3002 3003 3004; do
@@ -547,7 +547,7 @@ who | grep nyx1
 lsof -i :3002
 
 # Fix: Update the port in that persona's config.yaml and restart
-sudo launchctl kickstart -k system/com.archety.edge-nyx
+sudo launchctl kickstart -k system/com.ikiro.edge-nyx
 ```
 
 ### macOS logs out inactive users
@@ -571,10 +571,10 @@ caffeinate -s &
 
 ```bash
 # Option A: Build per-user
-sudo -u nyx1 bash -c "cd /Users/nyx1/Code/archety-edge/native/messages-helper && swift build -c release"
+sudo -u nyx1 bash -c "cd /Users/nyx1/Code/ikiro-edge/native/messages-helper && swift build -c release"
 
 # Option B: Share one binary but ensure read+execute permissions
-chmod 755 /Users/luna1/Code/archety-edge/native/messages-helper/.build/release/messages-helper
+chmod 755 /Users/luna1/Code/ikiro-edge/native/messages-helper/.build/release/messages-helper
 ```
 
 ---
@@ -583,12 +583,12 @@ chmod 755 /Users/luna1/Code/archety-edge/native/messages-helper/.build/release/m
 
 | Persona | macOS User | Health Port | Admin Port | LaunchDaemon Label |
 |---------|-----------|-------------|------------|-------------------|
-| Luna | luna1 | 3001 | 3100 | com.archety.edge-luna |
-| Nyx | nyx1 | 3002 | 3101 | com.archety.edge-nyx |
-| Echo | echo1 | 3003 | 3102 | com.archety.edge-echo |
-| Kael | kael1 | 3004 | 3103 | com.archety.edge-kael |
-| Char 5 | char5 | 3005 | 3104 | com.archety.edge-char5 |
-| Char 6 | char6 | 3006 | 3105 | com.archety.edge-char6 |
+| Luna | luna1 | 3001 | 3100 | com.ikiro.edge-luna |
+| Nyx | nyx1 | 3002 | 3101 | com.ikiro.edge-nyx |
+| Echo | echo1 | 3003 | 3102 | com.ikiro.edge-echo |
+| Kael | kael1 | 3004 | 3103 | com.ikiro.edge-kael |
+| Char 5 | char5 | 3005 | 3104 | com.ikiro.edge-char5 |
+| Char 6 | char6 | 3006 | 3105 | com.ikiro.edge-char6 |
 
 ---
 
@@ -659,7 +659,7 @@ sudo ./backup-databases.sh
 
 - Uses `sqlite3 .backup` (online-safe, works while agent is running)
 - Backs up: `edge-agent.db`, `data/edge-state.db`, `data/rules.db`, `data/plans.db`, `data/scheduler.db`
-- Destination: `/Users/<user>/Code/archety-edge/backups/<date>/`
+- Destination: `/Users/<user>/Code/ikiro-edge/backups/<date>/`
 - Keeps last 7 days, auto-rotates old backups
 - Also backs up the port registry
 
@@ -677,7 +677,7 @@ Sentry provides error alerting and per-persona monitoring using the existing `Se
 
 ### Setup
 
-1. Create a **single Sentry project** (e.g., `archety-edge`) at [sentry.io](https://sentry.io)
+1. Create a **single Sentry project** (e.g., `ikiro-edge`) at [sentry.io](https://sentry.io)
 2. Copy the DSN from Project Settings → Client Keys
 3. Pass it when provisioning personas:
 
@@ -704,7 +704,7 @@ Use **one DSN** for all personas. The `environment` flag (defaults to `"producti
 
 `setup-persona.sh` automatically installs a `newsyslog.d` config for each persona:
 
-- **Location:** `/etc/newsyslog.d/archety-edge-<persona>.conf`
+- **Location:** `/etc/newsyslog.d/ikiro-edge-<persona>.conf`
 - **Rotates** when logs reach 10MB
 - **Keeps** 7 compressed backups (gzip)
 - **Covers:** `logs/edge-agent.out.log`, `logs/edge-agent.err.log`, `edge-agent.log`

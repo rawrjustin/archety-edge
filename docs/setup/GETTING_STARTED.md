@@ -134,7 +134,7 @@ sudo ./setup-persona.sh \
   --edge-secret "your_shared_secret"
 
 # Restart a persona
-launchctl kickstart -k gui/$(id -u)/com.archety.edge-luna
+launchctl kickstart -k gui/$(id -u)/com.ikiro.edge-luna
 
 # View all personas and their status
 ./list-personas.sh

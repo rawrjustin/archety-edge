@@ -48,8 +48,8 @@ fi
 
 MAC_USER="${PERSONA_ID}${SHARD_ID}"
 USER_HOME="/Users/${MAC_USER}"
-PROJECT_DIR="${USER_HOME}/Code/archety-edge"
-PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
+PROJECT_DIR="${USER_HOME}/Code/ikiro-edge"
+PLIST_LABEL="com.ikiro.edge-${PERSONA_ID}${SHARD_ID}"
 PLIST_PATH="${USER_HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
 MAC_USER_UID=$(dscl . -read "/Users/${MAC_USER}" UniqueID 2>/dev/null | awk '{print $2}')
 

@@ -6,7 +6,7 @@
 #   - Uses sqlite3 .backup (online-safe, works while agent is running)
 #   - Backs up: edge-agent.db, data/edge-state.db, data/rules.db,
 #               data/plans.db, data/scheduler.db
-#   - Destination: /Users/<user>/Code/archety-edge/backups/<date>/
+#   - Destination: /Users/<user>/Code/ikiro-edge/backups/<date>/
 #   - Rotates: keeps last 7 days
 #   - Also backs up the port registry itself
 #
@@ -32,7 +32,7 @@ log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_done()  { echo -e "  ${GREEN}[done]${NC} $1"; }
 
-PORT_REGISTRY="/usr/local/etc/archety-edge-ports.json"
+PORT_REGISTRY="/usr/local/etc/ikiro-edge-ports.json"
 DATE=$(date +%Y-%m-%d)
 RETENTION_DAYS=7
 INSTALL_CRON=false
@@ -62,7 +62,7 @@ fi
 # --- Install cron mode ---
 if [[ "$INSTALL_CRON" == true ]]; then
   SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-  CRON_LINE="0 3 * * * ${SCRIPT_PATH} >> /var/log/archety-backup.log 2>&1"
+  CRON_LINE="0 3 * * * ${SCRIPT_PATH} >> /var/log/ikiro-backup.log 2>&1"
 
   # Check if already installed
   if crontab -l 2>/dev/null | grep -qF "backup-databases.sh"; then
@@ -90,13 +90,13 @@ TOTAL_BACKED=0
 TOTAL_SKIPPED=0
 
 # --- Back up port registry ---
-REGISTRY_BACKUP_DIR="/usr/local/etc/archety-backups"
+REGISTRY_BACKUP_DIR="/usr/local/etc/ikiro-backups"
 mkdir -p "$REGISTRY_BACKUP_DIR"
-cp "$PORT_REGISTRY" "${REGISTRY_BACKUP_DIR}/archety-edge-ports-${DATE}.json"
+cp "$PORT_REGISTRY" "${REGISTRY_BACKUP_DIR}/ikiro-edge-ports-${DATE}.json"
 log_done "Port registry backed up"
 
 # Rotate registry backups
-find "$REGISTRY_BACKUP_DIR" -name "archety-edge-ports-*.json" -mtime +${RETENTION_DAYS} -delete 2>/dev/null || true
+find "$REGISTRY_BACKUP_DIR" -name "ikiro-edge-ports-*.json" -mtime +${RETENTION_DAYS} -delete 2>/dev/null || true
 
 # --- Back up each persona's databases ---
 PERSONAS=$(python3 -c "
@@ -109,7 +109,7 @@ for pid in sorted(registry.keys()):
 ")
 
 while IFS='|' read -r PERSONA_ID MAC_USER; do
-  PROJECT_DIR="/Users/${MAC_USER}/Code/archety-edge"
+  PROJECT_DIR="/Users/${MAC_USER}/Code/ikiro-edge"
   BACKUP_DIR="${PROJECT_DIR}/backups/${DATE}"
 
   log_info "Backing up ${PERSONA_ID} (${MAC_USER})..."

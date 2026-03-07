@@ -11,7 +11,7 @@ This is a quick reference for setting up Sentry and Amplitude monitoring for the
 ## 1. Sentry Setup (10 min)
 
 ### Create Project
-1. Go to https://sentry.io/organizations/archety/projects/
+1. Go to https://sentry.io/organizations/ikiro/projects/
 2. Click "Create Project"
 3. Select "Node.js" as platform
 4. Name: "edge-agent"
@@ -178,9 +178,9 @@ HEALTH_CHECK_PORT=3002 npm run dev
 
 Once setup, bookmark these:
 
-- **Sentry Issues:** https://sentry.io/organizations/archety/issues/
-- **Sentry Performance:** https://sentry.io/organizations/archety/performance/
-- **Amplitude Events:** https://analytics.amplitude.com/archety/project/YOUR_PROJECT
+- **Sentry Issues:** https://sentry.io/organizations/ikiro/issues/
+- **Sentry Performance:** https://sentry.io/organizations/ikiro/performance/
+- **Amplitude Events:** https://analytics.amplitude.com/ikiro/project/YOUR_PROJECT
 - **Health Check:** http://localhost:3001/health (or your production URL)
 
 ## Next Steps

@@ -85,7 +85,7 @@ Backend might be slow or down:
 
 ```bash
 # Check backend health
-curl https://archety-backend.onrender.com/health
+curl https://api.ikiro.ai/health
 
 # Increase timeout (config.yaml)
 backend:
@@ -144,10 +144,10 @@ Logs show "Processing message" but no backend call or response
 cat config.yaml | grep url
 
 # Test backend manually
-curl https://archety-backend.onrender.com/health
+curl https://api.ikiro.ai/health
 
 # Check network connectivity
-ping archety-backend.onrender.com
+ping api.ikiro.ai
 ```
 
 ---
@@ -247,7 +247,7 @@ Messages take > 5 seconds to get responses
 
 3. **Check backend latency:**
    ```bash
-   curl -w "@curl-format.txt" https://archety-backend.onrender.com/health
+   curl -w "@curl-format.txt" https://api.ikiro.ai/health
    ```
 
 ---
@@ -424,7 +424,7 @@ If you're still stuck:
    osascript -e 'tell application "Messages" to return count of accounts'
 
    # Test backend
-   curl https://archety-backend.onrender.com/health
+   curl https://api.ikiro.ai/health
    ```
 
 4. **Collect debug info:**

@@ -248,7 +248,7 @@ edge:
   user_phone: "+1234567890"
 
 backend:
-  url: "https://archety-backend.onrender.com"
+  url: "https://api.ikiro.ai"
   sync_interval_seconds: 60
 
 imessage:
@@ -318,11 +318,11 @@ Future versions may explore:
 
 ## License
 
-Proprietary - Archety
+Proprietary - Ikiro
 
 ## Support
 
 - Documentation: `docs/` folder
 - Issues: Check logs with `./edge-agent.sh logs`
 - Configuration help: [Configuration Guide](docs/setup/CONFIGURATION.md)
-- Backend API: `https://archety-backend.onrender.com/docs`
+- Backend API: `https://api.ikiro.ai/docs`

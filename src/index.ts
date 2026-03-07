@@ -135,7 +135,7 @@ class EdgeAgent {
 
     const stateDbPath = this.config.database?.state_path || './data/edge-state.db';
     const keychainManager = new KeychainManager(
-      this.config.security?.keychain_service || 'com.archety.edge',
+      this.config.security?.keychain_service || 'com.ikiro.edge',
       this.config.security?.keychain_account || 'edge-state',
       this.logger
     );

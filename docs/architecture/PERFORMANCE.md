@@ -353,7 +353,7 @@ time npm start
 sqlite3 ~/Library/Messages/chat.db "EXPLAIN QUERY PLAN SELECT..."
 
 # Test backend connection pooling
-curl -w "@curl-format.txt" https://archety-backend.onrender.com/health
+curl -w "@curl-format.txt" https://api.ikiro.ai/health
 ```
 
 ---

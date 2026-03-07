@@ -10,7 +10,7 @@
 #
 # Optional:
 #   --backend-url "https://api.ikiro.ai"
-#   --repo-url "git@github.com:rawrjustin/archety-edge.git"
+#   --repo-url "git@github.com:rawrjustin/ikiro-edge.git"
 #   --environment "production"
 #   --sentry-dsn "https://xxx@oXXX.ingest.sentry.io/YYY"
 #   --posthog-key "your_posthog_project_api_key"
@@ -35,10 +35,10 @@ log_done()  { echo -e "  ${GREEN}[done]${NC} $1"; }
 
 # --- Defaults ---
 BACKEND_URL="https://api.ikiro.ai"
-REPO_URL="https://github.com/rawrjustin/archety-edge.git"
+REPO_URL="https://github.com/rawrjustin/ikiro-edge.git"
 ENVIRONMENT="production"
-MACOS_PASSWORD="archety"
-PORT_REGISTRY="/usr/local/etc/archety-edge-ports.json"
+MACOS_PASSWORD="ikiro"
+PORT_REGISTRY="/usr/local/etc/ikiro-edge-ports.json"
 PERSONA_ID=""
 PHONE=""
 EDGE_SECRET=""
@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Optional:"
       echo "  --backend-url   Backend URL (default: prod)"
-      echo "  --repo-url      Git repo URL (default: archety-edge)"
+      echo "  --repo-url      Git repo URL (default: ikiro-edge)"
       echo "  --environment   production or development (default: production)"
       echo "  --shard-id      Numeric shard suffix for user/agent naming (default: 1)"
       echo "  --sentry-dsn    Sentry DSN for edge runtime error tracking (optional)"
@@ -142,7 +142,7 @@ fi
 # --- Derived values ---
 MAC_USER="${PERSONA_ID}${SHARD_ID}"
 USER_HOME="/Users/${MAC_USER}"
-PROJECT_DIR="${USER_HOME}/Code/archety-edge"
+PROJECT_DIR="${USER_HOME}/Code/ikiro-edge"
 NODE_PATH="$(which node)"
 WEBSOCKET_URL="${BACKEND_URL/https:/wss:}"
 
@@ -340,7 +340,7 @@ $([ -n "$POSTHOG_KEY" ] && echo "    api_key: \"${POSTHOG_KEY}\"" || echo "    #
     port: ${HEALTH_PORT}
 
 security:
-  keychain_service: "com.archety.edge.${PERSONA_ID}.${SHARD_ID}"
+  keychain_service: "com.ikiro.edge.${PERSONA_ID}.${SHARD_ID}"
   keychain_account: "edge-state"
 YAML
 
@@ -379,7 +379,7 @@ log_done "data/ and logs/ directories created"
 # =============================================================================
 log_step "Installing LaunchAgent"
 
-PLIST_LABEL="com.archety.edge-${PERSONA_ID}${SHARD_ID}"
+PLIST_LABEL="com.ikiro.edge-${PERSONA_ID}${SHARD_ID}"
 LAUNCH_AGENTS_DIR="${USER_HOME}/Library/LaunchAgents"
 PLIST_PATH="${LAUNCH_AGENTS_DIR}/${PLIST_LABEL}.plist"
 ENTRY_FILE="${PROJECT_DIR}/dist/admin-portal/server/index.js"
@@ -518,10 +518,10 @@ log_done "Port registry updated"
 # =============================================================================
 log_step "Configuring log rotation"
 
-NEWSYSLOG_CONF="/etc/newsyslog.d/archety-edge-${PERSONA_ID}.conf"
+NEWSYSLOG_CONF="/etc/newsyslog.d/ikiro-edge-${PERSONA_ID}.conf"
 
 cat > "$NEWSYSLOG_CONF" << LOGCONF
-# Archety Edge Agent log rotation: ${PERSONA_ID}
+# Ikiro Edge Agent log rotation: ${PERSONA_ID}
 # Rotates at 10MB, keeps 7 compressed backups
 # logfilename                                                          [owner:group]  mode  count  size  when  flags
 ${PROJECT_DIR}/logs/edge-agent.out.log                                 ${MAC_USER}:staff  644  7  10000  *  GZ
@@ -579,7 +579,7 @@ echo "  6. Verify service state + health:"
 echo "     launchctl print gui/\$(id -u)/${PLIST_LABEL} | head -n 40"
 echo "     curl -s http://localhost:${HEALTH_PORT}/health"
 echo ""
-echo "  9. Ensure HMAC token wiring is present (if using older archety-edge checkout):"
+echo "  9. Ensure HMAC token wiring is present (if using older ikiro-edge checkout):"
 echo "     cp /Users/luna1/migrate_hmac_luna.sh ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh"
 echo "     sudo chown ${MAC_USER}:staff ${PROJECT_DIR}/migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh"
 echo "     sudo -u ${MAC_USER} bash -lc 'cd ${PROJECT_DIR} && chmod +x migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh && ./migrate_hmac_${PERSONA_ID}${SHARD_ID}.sh'"

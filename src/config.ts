@@ -151,7 +151,7 @@ export function loadConfig(configPath: string = './config.yaml'): Config {
   if (!config.security) {
     config.security = {};
   }
-  config.security.keychain_service = config.security.keychain_service ?? 'com.archety.edge';
+  config.security.keychain_service = config.security.keychain_service ?? 'com.ikiro.edge';
   config.security.keychain_account = config.security.keychain_account ?? 'edge-state';
 
   // Ensure state database path exists
