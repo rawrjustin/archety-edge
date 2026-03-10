@@ -100,7 +100,7 @@ export class RailwayClient implements IBackendClient {
     this.logger.info(`[${requestId}] 📤 Sending message to backend from ${request.sender} (${request.mode} chat)`);
     this.logger.debug(`[${requestId}] Text preview: ${textPreview}`);
 
-    const maxRetries = 2;
+    const maxRetries = 3;
     let lastError: any = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -153,17 +153,27 @@ export class RailwayClient implements IBackendClient {
           break;
         }
 
-        // Check if it's a connection error (cold start)
+        // Check if it's a connection error (cold start) or deploy-related error
         const isConnectionError = error.code === 'ECONNRESET' ||
-                                  error.code === 'ECONNREFUSED';
+                                  error.code === 'ECONNREFUSED' ||
+                                  error.code === 'EPIPE' ||
+                                  error.code === 'EAI_AGAIN' ||
+                                  error.message?.includes('socket hang up');
+
+        // 502/503 from Railway load balancer during deploys
+        const isDeployError = error.response?.status === 502 ||
+                              error.response?.status === 503;
 
         const isTimeout = error.code === 'ECONNABORTED' ||
                          error.message?.includes('timeout');
 
+        const isRetryable = isConnectionError || isDeployError;
+
         this.logger.error(`[${requestId}] ❌ Request failed after ${duration}ms (ended at ${endTimestamp})`);
 
-        if (isConnectionError && attempt < maxRetries) {
-          this.logger.warn(`[${requestId}] ⚠️  Attempt ${attempt} failed (${error.code}), retrying in ${5000 * attempt}ms...`);
+        if (isRetryable && attempt < maxRetries) {
+          const reason = isDeployError ? `HTTP ${error.response.status}` : error.code;
+          this.logger.warn(`[${requestId}] ⚠️  Attempt ${attempt} failed (${reason}), retrying in ${5000 * attempt}ms...`);
           await new Promise(resolve => setTimeout(resolve, 5000 * attempt));
           continue;
         }
