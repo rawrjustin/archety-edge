@@ -34,6 +34,7 @@ import { BackendAttachmentSummary, BackendMiniAppContext } from './interfaces/IB
 import { KeychainManager } from './utils/keychain';
 import { IMessageTransport, MessageAttachment } from './interfaces/IMessageTransport';
 import { NativeBridgeTransport } from './transports/NativeBridgeTransport';
+import { EmailSenderGate } from './validation/EmailSenderGate';
 
 /**
  * Main application class
@@ -55,6 +56,7 @@ class EdgeAgent {
   private attachmentCache: AttachmentCache;
   private attachmentProcessor: AttachmentProcessor;
   private photoTranscoder: PhotoTranscoder;
+  private emailSenderGate: EmailSenderGate;
   private pollInterval: NodeJS.Timeout | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
@@ -150,6 +152,9 @@ class EdgeAgent {
       maxPhotoBytes,
       this.photoTranscoder
     );
+
+    // Initialize email sender gate (phone is primary identifier)
+    this.emailSenderGate = new EmailSenderGate(this.logger);
 
     // Initialize command handler
     this.commandHandler = new CommandHandler(
@@ -449,6 +454,18 @@ class EdgeAgent {
         return;
       }
 
+      // Email sender gate: phone number is the primary identifier.
+      // If someone messages from an email Apple ID, block and reply locally.
+      // No backend cost — handled entirely on edge.
+      const emailRejection = this.emailSenderGate.check(
+        message.sender,
+        this.config.edge.persona_id
+      );
+      if (emailRejection) {
+        await this.transport.sendMessage(message.threadId, emailRejection, message.isGroup);
+        return;
+      }
+
       const activeContext = this.contextManager.getContext(message.threadId);
       const attachmentSummaries = await this.processMessageAttachments(message, activeContext);
 
@@ -612,6 +629,7 @@ class EdgeAgent {
       } else {
         this.logger.info('ℹ️  Backend did not request a response');
       }
+
     } catch (error: any) {
       this.logger.error('Error processing message:', error.message);
 
