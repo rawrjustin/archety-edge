@@ -79,6 +79,18 @@ else
   log_warn "Plist not found: ${PLIST_PATH}"
 fi
 
+# --- Stop and remove typing helper LaunchAgent ---
+TYPING_LABEL="com.ikiro.typing-${PERSONA_ID}${SHARD_ID}"
+TYPING_PLIST_PATH="${USER_HOME}/Library/LaunchAgents/${TYPING_LABEL}.plist"
+if [[ -n "$MAC_USER_UID" ]]; then
+  launchctl bootout "gui/${MAC_USER_UID}/${TYPING_LABEL}" 2>/dev/null || true
+fi
+if [[ -f "$TYPING_PLIST_PATH" ]]; then
+  rm -f "$TYPING_PLIST_PATH"
+  log_done "Typing helper plist removed"
+fi
+rm -f "/tmp/typing-helper-${MAC_USER}.sock"
+
 # --- Clean up old system-domain plist if it exists ---
 if launchctl list 2>/dev/null | grep -q "$PLIST_LABEL"; then
   log_warn "Stopping old system-domain service..."

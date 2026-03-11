@@ -271,6 +271,13 @@ else
   log_warn "Native helper directory not found, skipping (will use AppleScript transport)"
 fi
 
+# Build typing indicator helper (optional — requires SIP disabled)
+if [[ -d "${PROJECT_DIR}/native/typing-helper" ]]; then
+  log_info "Building typing indicator helper..."
+  sudo -u "$MAC_USER" bash -c "cd '${PROJECT_DIR}/native/typing-helper' && swift build -c release 2>&1" | tail -3
+  log_done "Typing indicator helper built"
+fi
+
 # Build TypeScript + admin portal
 log_info "Building TypeScript and admin portal..."
 sudo -u "$MAC_USER" bash -c "cd '$PROJECT_DIR' && npm run admin:build 2>&1" | tail -3
@@ -309,6 +316,7 @@ imessage:
   transport_mode: "native_helper"
   bridge_executable: "./native/messages-helper/.build/release/messages-helper"
   bridge_args: []
+  typing_socket_path: "/tmp/typing-helper-${MAC_USER}.sock"
 
 database:
   path: "./edge-agent.db"
@@ -486,6 +494,68 @@ chown "${MAC_USER}:staff" "$PLIST_PATH"
 chmod 644 "$PLIST_PATH"
 log_done "LaunchAgent installed: ${PLIST_LABEL}"
 log_done "Plist path: ${PLIST_PATH}"
+
+# --- Typing indicator daemon LaunchAgent ---
+TYPING_HELPER_BIN="${PROJECT_DIR}/native/typing-helper/.build/release/typing-helper"
+TYPING_SOCKET="/tmp/typing-helper-${MAC_USER}.sock"
+TYPING_LABEL="com.ikiro.typing-${PERSONA_ID}${SHARD_ID}"
+TYPING_PLIST_PATH="${LAUNCH_AGENTS_DIR}/${TYPING_LABEL}.plist"
+
+if [[ -f "$TYPING_HELPER_BIN" ]]; then
+  # Stop existing typing helper if running
+  if [[ -n "$MAC_USER_UID" ]]; then
+    launchctl bootout "gui/${MAC_USER_UID}/${TYPING_LABEL}" 2>/dev/null || true
+  fi
+
+  cat > "$TYPING_PLIST_PATH" << TPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${TYPING_LABEL}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>${TYPING_HELPER_BIN}</string>
+        <string>--socket</string>
+        <string>${TYPING_SOCKET}</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>${PROJECT_DIR}/logs/typing-helper.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>${PROJECT_DIR}/logs/typing-helper.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>${USER_HOME}</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
+TPLIST
+
+  chown "${MAC_USER}:staff" "$TYPING_PLIST_PATH"
+  chmod 644 "$TYPING_PLIST_PATH"
+  log_done "Typing helper LaunchAgent installed: ${TYPING_LABEL}"
+else
+  log_warn "Typing helper not built (SIP must be disabled for typing indicators)"
+fi
 
 # =============================================================================
 # Step 9: Update port registry

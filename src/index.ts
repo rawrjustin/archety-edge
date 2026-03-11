@@ -223,7 +223,8 @@ class EdgeAgent {
           attachmentsPath,
           dbPath: this.config.imessage.db_path,
           stateFilePath: './data/messages-helper-rowid',
-          maxMessageAgeSeconds: this.config.imessage.max_message_age_seconds
+          maxMessageAgeSeconds: this.config.imessage.max_message_age_seconds,
+          typingSocketPath: this.config.imessage.typing_socket_path
         },
         this.logger
       );

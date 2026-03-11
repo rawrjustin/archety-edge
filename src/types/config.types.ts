@@ -36,7 +36,8 @@ export const ConfigSchema = z.object({
     bridge_args: z.array(z.string()).optional(),
     enable_fast_check: z.boolean().optional(),
     max_messages_per_poll: z.number().min(1).max(1000).optional(),
-    max_message_age_seconds: z.number().min(60).max(86400).optional()
+    max_message_age_seconds: z.number().min(60).max(86400).optional(),
+    typing_socket_path: z.string().optional()
   }),
 
   database: z.object({
