@@ -262,6 +262,10 @@ export class RailwayClient implements IBackendClient {
       formData.append('caption', request.caption);
     }
 
+    if (request.participants && request.participants.length > 0) {
+      formData.append('participants', JSON.stringify(request.participants));
+    }
+
     // Merge FormData headers with our custom headers
     const uploadHeaders = {
       ...headers,

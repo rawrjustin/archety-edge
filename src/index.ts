@@ -993,7 +993,8 @@ class EdgeAgent {
             context: backendContext,
             // Group photo handling - backend will defer processing if group without Luna mention
             is_group: message.isGroup,
-            caption
+            caption,
+            participants: message.isGroup ? message.participants : undefined
           });
 
           const uploadDurationMs = Date.now() - uploadStartTime;
@@ -1089,7 +1090,8 @@ class EdgeAgent {
         attachment_guid: record.guid,
         context: backendContext,
         // Group photo handling - include cached group context
-        is_group: record.isGroup
+        is_group: record.isGroup,
+        participants: record.isGroup ? record.participants : undefined
         // Note: caption not available for retry - backend should handle without it
       });
 

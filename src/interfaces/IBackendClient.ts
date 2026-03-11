@@ -76,6 +76,7 @@ export interface PhotoUploadRequest {
   // Group photo handling
   is_group?: boolean;           // Whether this photo is from a group chat
   caption?: string;             // Photo caption text (backend checks for Luna mentions)
+  participants?: string[];      // Group chat members (phone numbers from iMessage)
 }
 
 export interface PhotoUploadResponse {
